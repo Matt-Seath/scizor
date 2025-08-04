@@ -1,0 +1,52 @@
+# Core trading dependencies
+backtrader==1.9.76.123
+ib_insync==0.9.86
+yfinance==0.2.28
+
+# Data and analysis
+pandas==2.1.4
+numpy==1.24.4
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.17.0
+
+# Configuration and utilities
+pyyaml==6.0.1
+python-dotenv==1.0.0
+loguru==0.7.2
+typer==0.9.0
+rich==13.7.0
+
+# Database (optional)
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Development
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+
+# API and web (optional for monitoring dashboard)
+fastapi==0.104.1
+uvicorn==0.24.0
+websockets==12.0
+
+# Async support
+aiohttp==3.9.1
+asyncio-mqtt==0.16.1
+
+# Notifications (optional)
+slack-sdk==3.26.1
+
+# Scheduling
+schedule==1.2.0
+
+# Additional database support
+psycopg2-binary==2.9.9  # PostgreSQL
+pymysql==1.1.0  # MySQL
