@@ -26,6 +26,7 @@ class IBKRWrapper(EWrapper):
         self.error_queue = Queue()
         self.next_order_id: Optional[int] = None
         self.connected = False
+        self.connection_ready = False  # Full connection readiness flag
         
         # Data storage
         self.market_data: Dict[int, Dict] = {}
@@ -34,6 +35,7 @@ class IBKRWrapper(EWrapper):
         self.account_values: Dict = {}
         self.open_orders: List = []
         self.executions: List = []
+        self.contract_details: Dict[int, List] = {}
         
     def error(self, reqId: TickerId, errorCode: int, errorString: str, advancedOrderRejectJson=""):
         """Handle error messages."""
@@ -55,9 +57,10 @@ class IBKRWrapper(EWrapper):
         self.connected = True
         
     def nextValidId(self, orderId: int):
-        """Receive next valid order ID."""
+        """Receive next valid order ID - indicates full connection readiness."""
         self.next_order_id = orderId
-        logger.info(f"Next valid order ID: {orderId}")
+        self.connection_ready = True  # Add connection readiness flag
+        logger.info(f"IBKR connection ready - Next valid order ID: {orderId}")
         
     def managedAccounts(self, accountsList: str):
         """Receive managed accounts."""
@@ -157,6 +160,17 @@ class IBKRWrapper(EWrapper):
             "timestamp": datetime.now()
         })
         
+    def contractDetails(self, reqId: int, contractDetails):
+        """Handle contract details response."""
+        if reqId not in self.contract_details:
+            self.contract_details[reqId] = []
+        self.contract_details[reqId].append(contractDetails)
+        logger.info(f"Received contract details for request {reqId}: {contractDetails.contract.symbol}")
+        
+    def contractDetailsEnd(self, reqId: int):
+        """Contract details response completed."""
+        logger.info(f"Contract details completed for request {reqId}")
+        
     def updateAccountValue(self, key: str, val: str, currency: str, accountName: str):
         """Handle account value updates."""
         self.account_values[key] = {
@@ -243,8 +257,8 @@ class IBKRClient(EClient):
         self._is_connected = False
         
     def is_connected(self) -> bool:
-        """Check if client is connected."""
-        return self._is_connected and self.wrapper.connected
+        """Check if client is connected and ready for requests."""
+        return self._is_connected and self.wrapper.connected and self.wrapper.connection_ready
         
     def disconnect_and_cleanup(self):
         """Disconnect and cleanup resources."""
@@ -261,11 +275,11 @@ class IBKRManager:
         self.host = host
         self.port = port
         self.client_id = client_id
-        
         self.wrapper = IBKRWrapper()
         self.client = IBKRClient(self.wrapper)
         self._reader_thread: Optional[threading.Thread] = None
         self._running = False
+        self._last_request_time = 0.0  # Track request timing for pacing
         
     async def connect(self, timeout: int = 30) -> bool:
         """Connect to IBKR API."""
@@ -289,8 +303,17 @@ class IBKRManager:
                 await self.disconnect()
                 return False
                 
-            # For read-only data collection, we don't need to wait for nextValidId
-            # Just return success once we have connection acknowledgment
+            logger.info("Socket connection established, waiting for connection readiness...")
+            
+            # Wait for nextValidID to indicate full connection readiness
+            start_time = time.time()
+            while not self.wrapper.connection_ready and (time.time() - start_time) < timeout:
+                await asyncio.sleep(0.1)
+                
+            if not self.wrapper.connection_ready:
+                logger.warning("Connection established but nextValidID not received - proceeding anyway")
+                # Don't fail here, some data requests might still work
+                
             logger.info("Successfully connected to IBKR API")
             return True
             
@@ -433,3 +456,55 @@ class IBKRManager:
             self.wrapper.next_order_id += 1
             return order_id
         return None
+
+    def request_contract_details(self, req_id: int, contract: Contract) -> bool:
+        """Request contract details."""
+        try:
+            self.client.reqContractDetails(req_id, contract)
+            logger.info(f"Requested contract details for {contract.symbol} (reqId: {req_id})")
+            return True
+        except Exception as e:
+            logger.error(f"Error requesting contract details: {e}")
+            return False
+
+    async def get_contract_details(self, contract: Contract, timeout: float = 10.0) -> Optional[List]:
+        """Get contract details with timeout and proper pacing."""
+        if not self.is_connected():
+            logger.error("Not connected to IBKR API")
+            return None
+            
+        # Enforce request pacing (minimum 50ms between requests)
+        current_time = time.time()
+        time_since_last = current_time - self._last_request_time
+        if time_since_last < 0.05:  # 50ms minimum
+            await asyncio.sleep(0.05 - time_since_last)
+        
+        # Generate unique req_id using timestamp to avoid conflicts
+        req_id = int(time.time() * 1000) % 100000 + 1000  
+        
+        # Ensure this request ID isn't already in use
+        if req_id in self.wrapper.contract_details:
+            del self.wrapper.contract_details[req_id]
+        
+        logger.info(f"Requesting contract details for {contract.symbol} with reqId {req_id}")
+        
+        # Request contract details
+        success = self.request_contract_details(req_id, contract)
+        if not success:
+            logger.error(f"Failed to send contract details request for {contract.symbol}")
+            return None
+            
+        self._last_request_time = time.time()  # Update request time
+            
+        # Wait for response - don't check connection during wait as it may be temporarily unavailable
+        start_time = time.time()
+        while req_id not in self.wrapper.contract_details and (time.time() - start_time) < timeout:
+            await asyncio.sleep(0.1)
+            
+        if req_id in self.wrapper.contract_details:
+            details = self.wrapper.contract_details[req_id]
+            logger.info(f"Successfully received {len(details)} contract details for {contract.symbol}")
+            return details
+        else:
+            logger.warning(f"Timeout waiting for contract details for {contract.symbol} (reqId: {req_id})")
+            return None
