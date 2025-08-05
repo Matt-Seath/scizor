@@ -163,6 +163,7 @@ class Strategy(Base):
     # Relationships
     backtest_jobs = relationship("BacktestJob", back_populates="strategy")
     live_strategies = relationship("LiveStrategy", back_populates="strategy")
+    risk_limits = relationship("RiskLimit", back_populates="strategy")
 
 
 # Backtest jobs
@@ -324,3 +325,27 @@ class RiskEvent(Base):
     
     created_at = Column(DateTime, default=func.now())
     resolved_at = Column(DateTime)
+
+
+class RiskLimit(Base):
+    """Risk limits for strategies and positions."""
+    
+    __tablename__ = "risk_limits"
+    
+    id = Column(Integer, primary_key=True)
+    strategy_id = Column(Integer, ForeignKey("strategies.id"), nullable=True)
+    
+    # Limit details
+    limit_type = Column(String(50), nullable=False)  # max_position_size, max_daily_loss, etc.
+    limit_value = Column(Float, nullable=False)
+    current_value = Column(Float, default=0.0)
+    threshold_warning = Column(Float, nullable=True)  # Warning threshold
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    strategy = relationship("Strategy", back_populates="risk_limits")
