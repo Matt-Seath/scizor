@@ -3,7 +3,8 @@
 import os
 from typing import Any, Dict, Optional
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class BaseConfig(BaseSettings):
@@ -21,10 +22,11 @@ class BaseConfig(BaseSettings):
         env="REDIS_URL"
     )
     
-    # IBKR Configuration
+    # IBKR Configuration (Gateway settings)
     ibkr_host: str = Field(default="127.0.0.1", env="IBKR_HOST")
-    ibkr_port: int = Field(default=7497, env="IBKR_PORT")
+    ibkr_port: int = Field(default=4001, env="IBKR_PORT")  # Gateway port
     ibkr_client_id: int = Field(default=1, env="IBKR_CLIENT_ID")
+    ibkr_read_only: bool = Field(default=True, env="IBKR_READ_ONLY")  # Match your read-only setting
     
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")

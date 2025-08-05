@@ -322,3 +322,18 @@ class PaginatedResponse(BaseModel):
         if 'total' in values and 'size' in values:
             return (values['total'] + values['size'] - 1) // values['size']
         return v
+
+
+class MarketDataResponse(BaseModel):
+    """Market data response model."""
+    
+    symbol: str = Field(..., description="Symbol")
+    timestamp: datetime = Field(..., description="Data timestamp")
+    price: Optional[float] = Field(None, description="Current price")
+    bid: Optional[float] = Field(None, description="Bid price")
+    ask: Optional[float] = Field(None, description="Ask price")
+    volume: Optional[int] = Field(None, description="Volume")
+    high: Optional[float] = Field(None, description="High price")
+    low: Optional[float] = Field(None, description="Low price")
+    open: Optional[float] = Field(None, description="Open price")
+    close: Optional[float] = Field(None, description="Close price")

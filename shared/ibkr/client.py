@@ -272,15 +272,11 @@ class IBKRManager:
         try:
             logger.info(f"Connecting to IBKR at {self.host}:{self.port} with client ID {self.client_id}")
             
-            # Connect to IBKR
-            connected = self.client.connect(self.host, self.port, self.client_id)
-            if not connected:
-                logger.error("Failed to connect to IBKR")
-                return False
-                
-            self.client._is_connected = True
+            # Connect to IBKR (note: this might return None instead of True)
+            connect_result = self.client.connect(self.host, self.port, self.client_id)
+            logger.info(f"client.connect() returned: {connect_result}")
             
-            # Start reader thread
+            # Start reader thread regardless of return value
             self._start_reader_thread()
             
             # Wait for connection acknowledgment
@@ -293,11 +289,8 @@ class IBKRManager:
                 await self.disconnect()
                 return False
                 
-            # Wait for next valid order ID
-            start_time = time.time()
-            while self.wrapper.next_order_id is None and (time.time() - start_time) < timeout:
-                await asyncio.sleep(0.1)
-                
+            # For read-only data collection, we don't need to wait for nextValidId
+            # Just return success once we have connection acknowledgment
             logger.info("Successfully connected to IBKR API")
             return True
             
