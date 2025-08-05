@@ -81,17 +81,18 @@ The SCIZOR algorithmic trading system foundation has been successfully built wit
 
 ## 🚧 **Next Steps (Implementation Required)**
 
-### 1. **Complete API Endpoints** (High Priority)
+### 1. **Complete API Endpoints** (In Progress) 
 ```bash
-# Backtester Service - Missing endpoints:
+# Backtester Service - Recently completed:
 services/backtester/api/
-├── backtests.py     # ⚠️  Needs implementation
-├── results.py       # ⚠️  Needs implementation  
-└── performance.py   # ⚠️  Needs implementation
+├── strategies.py    # ✅ Complete - Strategy CRUD operations
+├── backtests.py     # ✅ Complete - Backtest execution
+├── results.py       # ✅ Complete - Results and trades analysis
+└── performance.py   # ✅ Complete - Performance analytics
 
-# Algo Trader Service - Missing endpoints:
+# Algo Trader Service - Partially complete:
 services/algo-trader/api/
-├── trading.py       # ⚠️  Needs implementation
+├── trading.py       # ✅ Complete - Trading execution endpoints
 ├── orders.py        # ⚠️  Needs implementation
 ├── positions.py     # ⚠️  Needs implementation
 └── risk.py          # ⚠️  Needs implementation
