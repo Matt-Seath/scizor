@@ -58,90 +58,36 @@ class StrategyStatus(str, Enum):
     ERROR = "error"
 
 
-# Symbol tracking table
+# Symbol tracking table - Simplified for manual population
 class Symbol(Base):
-    """IBKR contract details and tracking information."""
+    """Simplified symbol tracking for ASX stocks - manual population friendly."""
     
     __tablename__ = "symbols"
     
     # Primary identification
     id = Column(Integer, primary_key=True, index=True)
-    symbol = Column(String(50), nullable=False, index=True)
-    exchange = Column(String(50), nullable=False, index=True)
-    currency = Column(String(10), nullable=False, default="USD")
+    symbol = Column(String(20), nullable=False, unique=True, index=True)  # e.g., "CBA"
+    company_name = Column(String(200), nullable=False)  # e.g., "Commonwealth Bank of Australia"
+    exchange = Column(String(20), nullable=False, index=True, default="ASX")  # e.g., "ASX"
+    currency = Column(String(10), nullable=False, default="AUD")  # e.g., "AUD"
     security_type = Column(SQLEnum(SecurityType), nullable=False, default=SecurityType.STOCK)
     
-    # IBKR Contract Details
-    contract_id = Column(Integer, unique=True, index=True)  # IBKR conId
-    local_symbol = Column(String(50))  # Local trading symbol
-    trading_class = Column(String(50))  # Trading class
-    multiplier = Column(String(10))  # Contract multiplier
+    # Essential Market Information
+    sector = Column(String(100))  # e.g., "Financials", "Materials"
+    market_cap_category = Column(String(20))  # e.g., "Large", "Mid", "Small"
     
-    # Options/Futures specific
-    expiry = Column(String(20))  # Expiration date
-    strike = Column(Float)  # Strike price for options
-    option_type = Column(String(10))  # 'C' for call, 'P' for put
-    right = Column(String(10))  # Contract right
+    # IBKR Integration (optional - can be populated later via API)
+    contract_id = Column(Integer, unique=True, index=True)  # IBKR conId (optional)
+    local_symbol = Column(String(50))  # e.g., "CBA.AX" for IBKR
     
-    # Company/Instrument Information
-    company_name = Column(String(200))  # Full company name
-    long_name = Column(String(200))  # Long descriptive name
-    industry = Column(String(100))  # Industry classification
-    category = Column(String(100))  # Category/subcategory
-    subcategory = Column(String(100))  # Sub-category
-    sector = Column(String(100))  # Business sector
-    
-    # Market Information
-    primary_exchange = Column(String(50))  # Primary exchange
-    market_name = Column(String(100))  # Market name
-    timezone_id = Column(String(50))  # Trading timezone
-    trading_hours = Column(String(200))  # Trading hours info
-    liquid_hours = Column(String(200))  # Liquid trading hours
-    
-    # Financial Metrics
-    market_cap = Column(Numeric(20, 2))  # Market capitalization
-    shares_outstanding = Column(BigInteger)  # Total shares outstanding
-    float_shares = Column(BigInteger)  # Floating shares
-    avg_volume = Column(BigInteger)  # Average trading volume
-    
-    # Price Information  
-    min_tick = Column(Numeric(10, 6))  # Minimum price increment
-    price_magnifier = Column(Integer)  # Price magnifier
-    order_types = Column(Text)  # Supported order types (JSON)
-    valid_exchanges = Column(Text)  # Valid exchanges (JSON)
-    
-    # Bond specific fields
-    bond_type = Column(String(50))  # Bond type
-    coupon_type = Column(String(50))  # Coupon type
-    callable = Column(Boolean)  # Is callable
-    putable = Column(Boolean)  # Is putable
-    coupon = Column(Float)  # Coupon rate
-    convertible = Column(Boolean)  # Is convertible
-    maturity = Column(String(20))  # Maturity date
-    issue_date = Column(String(20))  # Issue date
-    ratings = Column(String(100))  # Credit ratings
-    bond_desc = Column(String(200))  # Bond description
-    cusip = Column(String(20))  # CUSIP identifier
-    
-    # Fund specific fields
-    fund_name = Column(String(200))  # Fund name
-    fund_family = Column(String(100))  # Fund family
-    fund_type = Column(String(50))  # Fund type
-    fund_fees = Column(Float)  # Management fees
-    
-    # Additional Identifiers
-    isin = Column(String(20))  # ISIN code
-    cusip_num = Column(String(20))  # CUSIP number
-    sedol = Column(String(10))  # SEDOL code
-    ric = Column(String(20))  # Reuters code
-    
-    # Status and Metadata
+    # Trading Configuration
     active = Column(Boolean, default=True, index=True)
+    is_asx200 = Column(Boolean, default=False, index=True)  # ASX 200 constituent
+    priority = Column(Integer, default=100)  # Lower number = higher priority for data collection
+    
+    # Basic Market Data Settings
+    min_tick = Column(Numeric(10, 6), default=0.01)  # Minimum price increment (default ASX)
     tradeable = Column(Boolean, default=True)  # Is currently tradeable
-    market_data_available = Column(Boolean, default=True)  # Market data available
-    under_comp = Column(String(50))  # Underlying company
-    ev_rule = Column(String(50))  # Economic value rule
-    ev_multiplier = Column(Float)  # Economic value multiplier
     
     # Timestamps
     created_at = Column(DateTime, default=func.now())
@@ -153,10 +99,8 @@ class Symbol(Base):
     trades = relationship("Trade", back_populates="symbol")
     positions = relationship("Position", back_populates="symbol")
     
-    # Relationships
-    market_data = relationship("MarketData", back_populates="symbol")
-    trades = relationship("Trade", back_populates="symbol")
-    positions = relationship("Position", back_populates="symbol")
+    def __repr__(self):
+        return f"<Symbol(symbol='{self.symbol}', name='{self.company_name}', exchange='{self.exchange}')>"
 
 
 # Market data table
