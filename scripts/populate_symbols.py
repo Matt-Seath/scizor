@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Populate SCIZOR symbols table with ASX200 and popular NASDAQ stocks
+Populate SCIZOR symbols table with ASX200 stocks, popular NASDAQ stocks, and ASX ETFs
 """
 
 import asyncio
@@ -112,7 +112,6 @@ ASX_200_SYMBOLS = [
     
     # ASX 101-150 (Tier 4)
     {"symbol": "NEC", "name": "Nine Entertainment Co Holdings Ltd", "sector": "Communication Services"},
-    {"symbol": "STO", "name": "Santos Ltd", "sector": "Energy"},
     {"symbol": "OSH", "name": "Oil Search Ltd", "sector": "Energy"},
     {"symbol": "WHC", "name": "Whitehaven Coal Ltd", "sector": "Energy"},
     {"symbol": "NHC", "name": "New Hope Corp Ltd", "sector": "Energy"},
@@ -139,8 +138,6 @@ ASX_200_SYMBOLS = [
     {"symbol": "PPT", "name": "Perpetual Ltd", "sector": "Financials"},
     {"symbol": "PTM", "name": "Platinum Asset Management Ltd", "sector": "Financials"},
     {"symbol": "MFG", "name": "Magellan Financial Group Ltd", "sector": "Financials"},
-    {"symbol": "CBA", "name": "Commonwealth Bank of Australia", "sector": "Financials"},
-    {"symbol": "WBC", "name": "Westpac Banking Corp", "sector": "Financials"},
     
     # ASX 151-200 (Tier 5)
     {"symbol": "RWC", "name": "Reliance Worldwide Corp Ltd", "sector": "Industrials"},
@@ -153,13 +150,6 @@ ASX_200_SYMBOLS = [
     {"symbol": "KGN", "name": "Kogan.com Ltd", "sector": "Consumer Discretionary"},
     {"symbol": "PMV", "name": "Premier Investments Ltd", "sector": "Consumer Discretionary"},
     {"symbol": "SRV", "name": "Service Stream Ltd", "sector": "Industrials"},
-    {"symbol": "NAN", "name": "Nanosonics Ltd", "sector": "Health Care"},
-    {"symbol": "CSL", "name": "CSL Ltd", "sector": "Health Care"},
-    {"symbol": "COH", "name": "Cochlear Ltd", "sector": "Health Care"},
-    {"symbol": "RMD", "name": "ResMed Inc", "sector": "Health Care"},
-    {"symbol": "SHL", "name": "Sonic Healthcare Ltd", "sector": "Health Care"},
-    {"symbol": "RHC", "name": "Ramsay Health Care Ltd", "sector": "Health Care"},
-    {"symbol": "PME", "name": "Pro Medicus Ltd", "sector": "Health Care"},
     {"symbol": "NAN", "name": "Nanosonics Ltd", "sector": "Health Care"},
     {"symbol": "IVC", "name": "InvoCare Ltd", "sector": "Consumer Discretionary"},
     {"symbol": "SIG", "name": "Sigma Healthcare Ltd", "sector": "Health Care"},
@@ -195,6 +185,81 @@ ASX_200_SYMBOLS = [
     {"symbol": "ELD", "name": "Elders Ltd", "sector": "Industrials"},
     {"symbol": "GNC", "name": "Graincorp Ltd", "sector": "Consumer Staples"},
     {"symbol": "NUF", "name": "Nufarm Ltd", "sector": "Materials"}
+]
+
+# Popular ASX ETFs (Exchange Traded Funds)
+ASX_ETF_SYMBOLS = [
+    # Vanguard ETFs (Most Popular)
+    {"symbol": "VAS", "name": "Vanguard Australian Shares Index ETF", "sector": "ETF", "market_cap": "Large", "priority": 301},
+    {"symbol": "VGS", "name": "Vanguard MSCI Index International Shares ETF", "sector": "ETF", "market_cap": "Large", "priority": 302},
+    {"symbol": "VTS", "name": "Vanguard US Total Market Shares Index ETF", "sector": "ETF", "market_cap": "Large", "priority": 303},
+    {"symbol": "VEU", "name": "Vanguard All-World ex-US Shares Index ETF", "sector": "ETF", "market_cap": "Large", "priority": 304},
+    {"symbol": "VAP", "name": "Vanguard Australian Property Securities Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 305},
+    {"symbol": "VGB", "name": "Vanguard Australian Government Bond Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 306},
+    {"symbol": "VCF", "name": "Vanguard International Credit Securities Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 307},
+    {"symbol": "VDHG", "name": "Vanguard Diversified High Growth Index ETF", "sector": "ETF", "market_cap": "Large", "priority": 308},
+    {"symbol": "VDGR", "name": "Vanguard Diversified Growth Index ETF", "sector": "ETF", "market_cap": "Large", "priority": 309},
+    {"symbol": "VDBA", "name": "Vanguard Diversified Balanced Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 310},
+    {"symbol": "VDCO", "name": "Vanguard Diversified Conservative Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 311},
+    {"symbol": "VGE", "name": "Vanguard FTSE Emerging Markets Shares ETF", "sector": "ETF", "market_cap": "Mid", "priority": 312},
+    
+    # iShares ETFs
+    {"symbol": "IVV", "name": "iShares Core S&P 500 ETF", "sector": "ETF", "market_cap": "Large", "priority": 313},
+    {"symbol": "IOZ", "name": "iShares Core S&P/ASX 200 ETF", "sector": "ETF", "market_cap": "Large", "priority": 314},
+    {"symbol": "IJH", "name": "iShares Core S&P Mid-Cap ETF", "sector": "ETF", "market_cap": "Mid", "priority": 315},
+    {"symbol": "IJR", "name": "iShares Core S&P Small-Cap ETF", "sector": "ETF", "market_cap": "Mid", "priority": 316},
+    {"symbol": "IEU", "name": "iShares Core MSCI Europe IMI Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 317},
+    {"symbol": "IAA", "name": "iShares Core Composite Bond ETF", "sector": "ETF", "market_cap": "Mid", "priority": 318},
+    {"symbol": "IEM", "name": "iShares MSCI Emerging Markets IMI Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 319},
+    {"symbol": "IEMA", "name": "iShares MSCI Emerging Markets Asia ETF", "sector": "ETF", "market_cap": "Small", "priority": 320},
+    
+    # SPDR State Street ETFs
+    {"symbol": "STW", "name": "SPDR S&P/ASX 200 Fund", "sector": "ETF", "market_cap": "Large", "priority": 321},
+    {"symbol": "SFY", "name": "SPDR S&P/ASX 50 Fund", "sector": "ETF", "market_cap": "Large", "priority": 322},
+    {"symbol": "SPY", "name": "SPDR S&P 500 ETF Trust", "sector": "ETF", "market_cap": "Large", "priority": 323},
+    {"symbol": "SLF", "name": "SPDR S&P/ASX 200 Listed Property Fund", "sector": "ETF", "market_cap": "Mid", "priority": 324},
+    
+    # BetaShares ETFs
+    {"symbol": "A200", "name": "BetaShares Australia 200 ETF", "sector": "ETF", "market_cap": "Large", "priority": 325},
+    {"symbol": "NDQ", "name": "BetaShares NASDAQ 100 ETF", "sector": "ETF", "market_cap": "Large", "priority": 326},
+    {"symbol": "BBOZ", "name": "BetaShares Strong Australian Dollar Hedge Fund", "sector": "ETF", "market_cap": "Small", "priority": 327},
+    {"symbol": "BEAR", "name": "BetaShares Australian Equities Strong Bear Hedge Fund", "sector": "ETF", "market_cap": "Small", "priority": 328},
+    {"symbol": "GEAR", "name": "BetaShares Geared Australian Equity Fund", "sector": "ETF", "market_cap": "Small", "priority": 329},
+    {"symbol": "GOLD", "name": "BetaShares Gold Bullion ETF", "sector": "ETF", "market_cap": "Mid", "priority": 330},
+    {"symbol": "CRYP", "name": "BetaShares Crypto Innovators ETF", "sector": "ETF", "market_cap": "Small", "priority": 331},
+    {"symbol": "ASIA", "name": "BetaShares Asia Technology Tigers ETF", "sector": "ETF", "market_cap": "Mid", "priority": 332},
+    {"symbol": "HACK", "name": "BetaShares Global Cybersecurity ETF", "sector": "ETF", "market_cap": "Small", "priority": 333},
+    {"symbol": "RBTZ", "name": "BetaShares Global Robotics and Artificial Intelligence ETF", "sector": "ETF", "market_cap": "Small", "priority": 334},
+    {"symbol": "DRUG", "name": "BetaShares Global Healthcare ETF", "sector": "ETF", "market_cap": "Small", "priority": 335},
+    {"symbol": "FOOD", "name": "BetaShares Global Agriculture Companies ETF", "sector": "ETF", "market_cap": "Small", "priority": 336},
+    {"symbol": "FUEL", "name": "BetaShares Global Energy Companies ETF", "sector": "ETF", "market_cap": "Small", "priority": 337},
+    {"symbol": "TECH", "name": "BetaShares S&P/ASX Australian Technology ETF", "sector": "ETF", "market_cap": "Mid", "priority": 338},
+    
+    # VanEck ETFs
+    {"symbol": "MVW", "name": "VanEck Vectors MSCI World ex Australia Quality ETF", "sector": "ETF", "market_cap": "Mid", "priority": 339},
+    {"symbol": "MVA", "name": "VanEck Vectors MSCI Australian Small Companies Index ETF", "sector": "ETF", "market_cap": "Mid", "priority": 340},
+    {"symbol": "QUAL", "name": "VanEck Vectors MSCI World ex Australia Quality ETF", "sector": "ETF", "market_cap": "Mid", "priority": 341},
+    {"symbol": "MOAT", "name": "VanEck Vectors Morningstar Wide Moat ETF", "sector": "ETF", "market_cap": "Mid", "priority": 342},
+    {"symbol": "GLDM", "name": "VanEck Vectors Gold Miners ETF", "sector": "ETF", "market_cap": "Mid", "priority": 343},
+    
+    # Magellan ETFs
+    {"symbol": "MGE", "name": "Magellan Global Equities Fund", "sector": "ETF", "market_cap": "Large", "priority": 344},
+    {"symbol": "MHH", "name": "Magellan High Conviction Fund", "sector": "ETF", "market_cap": "Mid", "priority": 345},
+    
+    # Russell Investments ETFs
+    {"symbol": "RDV", "name": "Russell High Dividend Australian Shares ETF", "sector": "ETF", "market_cap": "Mid", "priority": 346},
+    
+    # ActiveX ETFs
+    {"symbol": "ACDC", "name": "ActiveX Ardea Real Outcome Bond Fund", "sector": "ETF", "market_cap": "Small", "priority": 347},
+    
+    # Global X ETFs
+    {"symbol": "ROBO", "name": "Global X Robotics & Artificial Intelligence ETF", "sector": "ETF", "market_cap": "Small", "priority": 348},
+    {"symbol": "CLNE", "name": "Global X Clean Energy ETF", "sector": "ETF", "market_cap": "Small", "priority": 349},
+    
+    # Specialty and Sector ETFs
+    {"symbol": "QFN", "name": "BetaShares S&P/ASX 200 Financials Sector ETF", "sector": "ETF", "market_cap": "Mid", "priority": 350},
+    {"symbol": "QRE", "name": "BetaShares S&P/ASX 200 Resources Sector ETF", "sector": "ETF", "market_cap": "Mid", "priority": 351},
+    {"symbol": "YMAX", "name": "BetaShares Australia Top 20 Equity Yield Maximiser Fund", "sector": "ETF", "market_cap": "Mid", "priority": 352}
 ]
 
 # Popular NASDAQ Symbols (Top 100 most traded)
@@ -408,6 +473,32 @@ async def populate_symbols():
                     total_skipped += 1
                     logger.info(f"⏭️  Skipped existing NASDAQ symbol: {symbol_data['symbol']}")
             
+            # Process ASX ETF symbols
+            logger.info("💼 Processing ASX ETF symbols...")
+            for symbol_data in ASX_ETF_SYMBOLS:
+                if symbol_data["symbol"] not in existing_symbols:
+                    new_symbol = Symbol(
+                        symbol=symbol_data["symbol"],
+                        company_name=symbol_data["name"],
+                        exchange="ASX",
+                        currency="AUD",
+                        security_type=SecurityType.ETF,
+                        sector=symbol_data.get("sector", "ETF"),
+                        market_cap_category=symbol_data.get("market_cap", "Mid"),
+                        local_symbol=f"{symbol_data['symbol']}.AX",  # IBKR format
+                        active=True,
+                        is_asx200=False,  # ETFs are separate from ASX200
+                        priority=symbol_data.get("priority", 300),  # Lower priority than individual stocks
+                        min_tick=0.01,  # Standard ASX tick size
+                        tradeable=True
+                    )
+                    session.add(new_symbol)
+                    total_added += 1
+                    logger.info(f"✨ Added ASX ETF symbol: {symbol_data['symbol']} - {symbol_data['name']}")
+                else:
+                    total_skipped += 1
+                    logger.info(f"⏭️  Skipped existing ASX ETF symbol: {symbol_data['symbol']}")
+            
             # Commit all changes
             await session.commit()
             
@@ -419,7 +510,8 @@ async def populate_symbols():
             logger.info(f"📊 Summary:")
             logger.info(f"   • ASX 200 symbols: {len(ASX_200_SYMBOLS)}")
             logger.info(f"   • NASDAQ symbols: {len(NASDAQ_SYMBOLS)}")
-            logger.info(f"   • Total symbols available: {len(ASX_200_SYMBOLS) + len(NASDAQ_SYMBOLS)}")
+            logger.info(f"   • ASX ETF symbols: {len(ASX_ETF_SYMBOLS)}")
+            logger.info(f"   • Total symbols available: {len(ASX_200_SYMBOLS) + len(NASDAQ_SYMBOLS) + len(ASX_ETF_SYMBOLS)}")
             logger.info(f"   • New symbols added: {total_added}")
             logger.info(f"   • Existing symbols skipped: {total_skipped}")
             logger.info(f"   • Total symbols in database: {final_count}")
@@ -427,7 +519,8 @@ async def populate_symbols():
             return {
                 "asx_symbols": len(ASX_200_SYMBOLS),
                 "nasdaq_symbols": len(NASDAQ_SYMBOLS),
-                "total_available": len(ASX_200_SYMBOLS) + len(NASDAQ_SYMBOLS),
+                "asx_etf_symbols": len(ASX_ETF_SYMBOLS),
+                "total_available": len(ASX_200_SYMBOLS) + len(NASDAQ_SYMBOLS) + len(ASX_ETF_SYMBOLS),
                 "added": total_added,
                 "skipped": total_skipped,
                 "final_count": final_count
@@ -449,6 +542,7 @@ async def main():
         print("="*60)
         print(f"📊 ASX 200 Symbols: {result['asx_symbols']}")
         print(f"💻 NASDAQ Symbols: {result['nasdaq_symbols']}")
+        print(f"💼 ASX ETF Symbols: {result['asx_etf_symbols']}")
         print(f"🌎 Total Universe: {result['total_available']} symbols")
         print(f"✨ Newly Added: {result['added']}")
         print(f"💾 Total in Database: {result['final_count']}")

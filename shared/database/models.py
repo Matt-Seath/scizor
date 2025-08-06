@@ -35,6 +35,7 @@ class SecurityType(str, Enum):
     BOND = "BOND"
     COMMODITY = "CMDTY"
     CFD = "CFD"
+    ETF = "ETF"
 
 
 class OrderStatus(str, Enum):
