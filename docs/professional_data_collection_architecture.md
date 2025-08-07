@@ -1,16 +1,16 @@
-# Professional Day Trading Data Collection Architecture
-**SCIZOR Real-Time Data Farmer - Professional Implementation Strategy**
+#  Day Trading Data Collection Architecture
+**SCIZOR Real-Time Data Farmer -  Implementation Strategy**
 
 **Created**: August 7, 2025  
-**Purpose**: Professional-grade data collection system for 18-stock ASX portfolio  
-**Context**: Day-trading professional implementation approach
+**Purpose**: -grade data collection system for 18-stock ASX portfolio  
+**Context**: Day-trading  implementation approach
 
 ---
 
-## 🎯 Professional Day Trader Mindset
+## 🎯  Day Trader Mindset
 
 ### **Core Philosophy: Data is Alpha**
-As a day-trading professional, I think about data collection in these critical terms:
+As a day-trading , I think about data collection in these critical terms:
 
 1. **Latency = Money**: Every millisecond of delay costs profit opportunities
 2. **Quality > Quantity**: Perfect data on 18 stocks beats poor data on 200 stocks
@@ -20,7 +20,7 @@ As a day-trading professional, I think about data collection in these critical t
 
 ---
 
-## 🏗️ Professional Architecture Design
+## 🏗️  Architecture Design
 
 ### **Layer 1: Data Ingestion (Real-Time)**
 ```
@@ -69,7 +69,7 @@ As a day-trading professional, I think about data collection in these critical t
 
 #### **1.1 Core Infrastructure**
 ```python
-# Professional data collection service architecture
+#  data collection service architecture
 services/
 ├── data-farmer/
 │   ├── core/
@@ -99,7 +99,7 @@ TIER_1_STOCKS = [
     "ANZ", "NAB", "WOW", "WES"
 ]
 
-# Professional configuration
+#  configuration
 COLLECTION_CONFIG = {
     "market_data_lines": 40,        # Reserve 60 for scaling
     "tick_buffer_size": 10000,      # In-memory tick buffer
@@ -112,12 +112,12 @@ COLLECTION_CONFIG = {
 ```
 
 ### **Phase 2: Production Grade (Days 4-7)**
-**Goal**: Full 18-stock portfolio with professional features
+**Goal**: Full 18-stock portfolio with  features
 
 #### **2.1 Advanced Data Processing**
 ```python
 # Real-time technical analysis pipeline
-class ProfessionalDataPipeline:
+class DataPipeline:
     def __init__(self):
         self.indicators = {
             "sma": [10, 20, 50],           # Moving averages
@@ -147,7 +147,7 @@ class ProfessionalDataPipeline:
             await self.signal_dispatcher.dispatch(symbol, signals)
 ```
 
-#### **2.2 Professional Monitoring**
+#### **2.2  Monitoring**
 ```python
 # Real-time system monitoring
 class SystemMonitor:
@@ -188,7 +188,7 @@ class SystemMonitor:
 
 #### **3.1 Signal Generation Engine**
 ```python
-class ProfessionalSignalEngine:
+class SignalEngine:
     def __init__(self):
         self.strategies = [
             MomentumStrategy(),
@@ -250,7 +250,7 @@ class RealTimeRiskManager:
 
 ## 🔧 Technical Implementation Details
 
-### **Professional Data Flow Architecture**
+### ** Data Flow Architecture**
 ```
 Market Data → IBKR Gateway → Connection Manager → Data Validator
      ↓
@@ -265,7 +265,7 @@ Trade Execution → Position Tracking → Performance Monitoring
 
 #### **1. Connection Manager (Bulletproof IBKR)**
 ```python
-class ProfessionalConnectionManager:
+class ConnectionManager:
     def __init__(self):
         self.primary_port = 4001        # Paper trading gateway
         self.backup_ports = [4002, 7497] # Live gateway, TWS
@@ -298,14 +298,14 @@ class ProfessionalConnectionManager:
 
 #### **2. Data Validator (Quality Assurance)**
 ```python
-class ProfessionalDataValidator:
+class DataValidator:
     def __init__(self):
         self.price_change_threshold = 0.10  # 10% max price change
         self.volume_spike_threshold = 5.0   # 5x average volume
         self.bid_ask_spread_threshold = 0.05 # 5% max spread
         
     def validate_tick(self, symbol: str, tick: TickData) -> ValidationResult:
-        """Professional-grade tick validation"""
+        """-grade tick validation"""
         issues = []
         
         # Price sanity check
@@ -333,7 +333,7 @@ class ProfessionalDataValidator:
 
 #### **3. Performance Monitor (Mission Critical)**
 ```python
-class ProfessionalPerformanceMonitor:
+class PerformanceMonitor:
     def __init__(self):
         self.latency_buckets = {
             "excellent": 0,     # < 10ms
@@ -366,11 +366,11 @@ class ProfessionalPerformanceMonitor:
 
 ---
 
-## 📊 Professional Monitoring Dashboard
+## 📊  Monitoring Dashboard
 
 ### **Real-Time KPIs**
 ```python
-PROFESSIONAL_KPIS = {
+_KPIS = {
     # Data Quality Metrics
     "tick_rate_per_symbol": "target: >10 ticks/second per symbol",
     "data_latency_p95": "target: <50ms 95th percentile",
@@ -393,7 +393,7 @@ PROFESSIONAL_KPIS = {
 
 ### **Alert System**
 ```python
-class ProfessionalAlertManager:
+class AlertManager:
     def __init__(self):
         self.alert_channels = {
             "critical": ["email", "sms", "slack"],      # Market hours system failures
@@ -434,7 +434,7 @@ class ProfessionalAlertManager:
 - [ ] **Performance Tracking**: Real-time P&L and position monitoring
 - [ ] **Risk Management**: Automated position/sector limit enforcement
 - [ ] **Scalability**: Ready for additional stocks/strategies
-- [ ] **Professional Grade**: Meets institutional data standards
+- [ ] ** Grade**: Meets institutional data standards
 
 ---
 
@@ -442,7 +442,7 @@ class ProfessionalAlertManager:
 
 ### **Immediate Actions (Today)**
 1. **Architecture Review**: Validate this approach against existing codebase
-2. **Environment Setup**: Configure professional monitoring tools
+2. **Environment Setup**: Configure  monitoring tools
 3. **Priority Implementation**: Start with Tier 1 stocks (8 core positions)
 4. **Testing Framework**: Set up comprehensive data validation testing
 
@@ -458,7 +458,7 @@ class ProfessionalAlertManager:
 - Build signal generation pipeline
 - Integrate with risk management system
 
-This professional architecture ensures your data collection system can handle the demands of serious day trading while staying within IBKR free-tier constraints. The key is building bulletproof reliability from day one, then scaling with confidence.
+This  architecture ensures your data collection system can handle the demands of serious day trading while staying within IBKR free-tier constraints. The key is building bulletproof reliability from day one, then scaling with confidence.
 
 ---
 

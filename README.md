@@ -2,15 +2,15 @@
 
 A production-ready microservices trading platform with intelligent data collection, comprehensive API framework, and advanced symbol management. Built for scalability with institutional-grade featu### API Endpoints
 
-### Collector (Port 8000) - **✅ PROFESSIONAL**
+### Collector (Port 8000) - **✅ **
 - `GET /api/symbols` - List tracked symbols with validation status
 - `POST /api/symbols` - Add new symbols with automatic validation  
 - `DELETE /api/symbols/{symbol}` - Remove symbols with cleanup
 - `GET /api/data/{symbol}` - Get historical OHLCV data
 - `POST /api/collect/{symbol}` - Trigger manual data collection
 - `POST /api/collect/historical/{symbol}` - Trigger historical data collection ⭐ **NEW**
-- `GET /api/watchlist` - Manage professional watchlists ⭐ **NEW**
-- `GET /api/health` - Professional service health monitoring ⭐ **NEW**
+- `GET /api/watchlist` - Manage  watchlists ⭐ **NEW**
+- `GET /api/health` -  service health monitoring ⭐ **NEW**
 - `WS /ws/realtime` - Real-time market data stream ⭐ **NEW**roven IBKR integration.
 
 ## 🚀 Current Status: Foundation Excellence Achieved
@@ -57,12 +57,12 @@ A production-ready microservices trading platform with intelligent data collecti
 - **Data Quality**: Validated price relationships with integrity constraints
 - **Operational Status**: Production-ready with comprehensive error handling
 
-### **Professional Trading Architecture** ⭐ **NEW** 
+### ** Trading Architecture** ⭐ **NEW** 
 - **18-Stock ASX Strategy**: Optimized portfolio for IBKR free-tier constraints ([Strategy Details](docs/asx_stock_selection_strategy.md))
 - **Hybrid Data Collection**: Persistent real-time service + scheduled historical scripts ([Architecture](docs/hybrid_architecture_decision.md))
 - **Database-Driven Configuration**: Dynamic watchlist management without service restarts
-- **Professional Rate Limiting**: Bulletproof IBKR API compliance with centralized coordination
-- **Institutional Monitoring**: Real-time KPIs, health checks, and professional alerting
+- ** Rate Limiting**: Bulletproof IBKR API compliance with centralized coordination
+- **Institutional Monitoring**: Real-time KPIs, health checks, and  alerting
 
 ### **Symbol Management** ✅ **ENHANCED** 
 - **Intelligent Caching**: Skip recently verified symbols (90-day window)
@@ -80,16 +80,16 @@ A production-ready microservices trading platform with intelligent data collecti
 
 ## Services
 
-### 1. Collector (Port 8000) ✅ **PROFESSIONAL**
-- **Purpose**: Professional-grade market data collection for day trading
+### 1. Collector (Port 8000) ✅ ****
+- **Purpose**: -grade market data collection for day trading
 - **Technology**: FastAPI + asyncio for high-performance real-time data processing
 - **Status**: Production deployment with 18-stock ASX strategy implementation
 - **Architecture**: Hybrid real-time service + scheduled historical collection
 - **Features**: 
   - Real-time 5min bars during market hours (database-driven watchlist)
-  - Historical data backfill with professional rate limiting
+  - Historical data backfill with  rate limiting
   - Bulletproof connection management with auto-reconnection
-  - Professional data validation and quality monitoring
+  -  data validation and quality monitoring
   - Centralized rate limiting coordination (IBKR API compliance)
   - Health monitoring with institutional-grade alerting
   - Integrated cron scripts for scheduled data collection
@@ -175,53 +175,53 @@ python scripts/historical_symbol_data_collection.py AAPL
 python scripts/historical_symbol_data_collection.py AAPL --start-date 2022-01-01 --end-date 2023-12-31
 ```
 
-## Professional Trading Setup ⭐ **NEW**
+##  Trading Setup ⭐ **NEW**
 
 For serious day trading with the 18-stock ASX strategy:
 
-### Professional Deployment
+###  Deployment
 ```bash
-# 1. Initialize professional watchlist (18-stock ASX strategy)
-python scripts/populate_asx_professional_watchlist.py
+# 1. Initialize  watchlist (18-stock ASX strategy)
+python scripts/populate_asx__watchlist.py
 
-# 2. Deploy professional collector service
-docker-compose -f docker-compose.professional.yml up -d
+# 2. Deploy  collector service
+docker-compose -f docker-compose..yml up -d
 
-# 3. Verify professional monitoring
-python services/collector/scripts/professional_health_check.py --dashboard
+# 3. Verify  monitoring
+python services/collector/scripts/_health_check.py --dashboard
 
 # 4. Start real-time data collection
 python services/collector/main.py
 ```
 
-### Professional Monitoring
+###  Monitoring
 ```bash
 # Real-time performance dashboard
-curl http://localhost:8000/api/professional/dashboard
+curl http://localhost:8000/api//dashboard
 
 # Check data collection KPIs
-curl http://localhost:8000/api/professional/kpis
+curl http://localhost:8000/api//kpis
 
 # View watchlist configuration
-python scripts/manage_watchlist.py list --name asx_professional
+python scripts/manage_watchlist.py list --name asx_
 
 # Monitor service health
-curl http://localhost:8000/api/professional/health
+curl http://localhost:8000/api//health
 ```
 
-### Professional Operations
+###  Operations
 ```bash
-# Add new stock to professional watchlist
-python scripts/manage_watchlist.py add --symbol "NEW" --name asx_professional --priority 2
+# Add new stock to  watchlist
+python scripts/manage_watchlist.py add --symbol "NEW" --name asx_ --priority 2
 
 # Update stock priority  
-python scripts/manage_watchlist.py update --symbol "CBA" --name asx_professional --priority 1
+python scripts/manage_watchlist.py update --symbol "CBA" --name asx_ --priority 1
 
 # Emergency service restart
-docker-compose -f docker-compose.professional.yml restart collector-service
+docker-compose -f docker-compose..yml restart collector-service
 
 # Run historical data collection manually
-python services/collector/scripts/historical_collection.py --watchlist asx_professional
+python services/collector/scripts/historical_collection.py --watchlist asx_
 
 # Check cron job status
 python services/collector/scripts/cron_status.py
@@ -392,7 +392,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Paper Trading Recommended**: Always start with paper trading accounts
 - **Risk Management Essential**: Implement proper risk controls before live trading  
-- **Professional Advice**: Consult qualified financial professionals before trading
+- ** Advice**: Consult qualified financial s before trading
 - **No Guarantees**: Past performance does not guarantee future results
 
 ## Support & Documentation

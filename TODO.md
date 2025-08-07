@@ -2,11 +2,11 @@
 
 **Last Updated**: August 7, 2025  
 **Version**: 3.0.0-alpha  
-**Phase**: Ready for Professional Trading Features Implementation  
+**Phase**: Ready for  Trading Features Implementation  
 
 ## 🎯 Overview
 
-This document tracks incomplete tasks and missing features required to transform SCIZOR into a professional-grade algorithmic trading platform. All items are prioritized based on professional trading requirements and business value.
+This document tracks incomplete tasks and missing features required to transform SCIZOR into a -grade algorithmic trading platform. All items are prioritized based on  trading requirements and business value.
 
 ---
 
@@ -19,41 +19,41 @@ This document tracks incomplete tasks and missing features required to transform
 - ✅ Historical data collection (multi-year)
 - ✅ Basic backtesting capability
 
-### **Critical Gaps for Professional Use** ❌
-- ❌ Professional data collection implementation (see `docs/hybrid_architecture_decision.md`)
+### **Critical Gaps for  Use** ❌
+- ❌  data collection implementation (see `docs/hybrid_architecture_decision.md`)
 - ❌ Database-driven 18-stock ASX strategy deployment
 - ❌ Live trading engine implementation
 - ❌ Advanced risk management systems
-- ❌ Professional-grade backtesting features
+- ❌ -grade backtesting features
 - ❌ Real-time performance monitoring
 - ❌ Production-ready execution modeling
 
 ### **Key Strategic Documents** 📚
 - 📋 **18-Stock ASX Strategy**: `docs/asx_stock_selection_strategy.md`
-- 🏗️ **Professional Data Architecture**: `docs/hybrid_architecture_decision.md`
-- 📊 **Professional Implementation**: `docs/professional_data_collection_architecture.md`
+- 🏗️ ** Data Architecture**: `docs/hybrid_architecture_decision.md`
+- 📊 ** Implementation**: `docs/_data_collection_architecture.md`
 - 🚀 **Collector Service Structure**: `services/collector/` (FastAPI + integrated cron scripts)
 
 ---
 
-## 🎯 Priority 1: Professional Collector Service Implementation (Phase 3A)
+## 🎯 Priority 1:  Collector Service Implementation (Phase 3A)
 **Target**: 7-10 days  
 **Status**: 🔴 **CRITICAL - FOUNDATION FOR TRADING**
 
 ### **3A.1 FastAPI Collector Service Foundation** ⭐ **NEW** ❌
-- [ ] **Professional Collector Service Architecture**
+- [ ] ** Collector Service Architecture**
   - [ ] Create `services/collector/` FastAPI application structure
   - [ ] Implement high-performance async API endpoints for data collection control
   - [ ] Build WebSocket endpoints for real-time data streaming
-  - [ ] Create professional health monitoring and metrics endpoints
+  - [ ] Create  health monitoring and metrics endpoints
   - [ ] Integrate with existing database models and IBKR client infrastructure
 
 - [ ] **Integrated Cron Scripts** (within collector service)
   - [ ] Move and enhance existing cron scripts to `services/collector/scripts/`
-  - [ ] Create `services/collector/scripts/historical_collection.py` with professional rate limiting
+  - [ ] Create `services/collector/scripts/historical_collection.py` with  rate limiting
   - [ ] Build `services/collector/scripts/daily_collection.py` for EOD data
   - [ ] Implement `services/collector/scripts/cron_manager.py` for job coordination
-  - [ ] Add professional logging and monitoring for all scheduled tasks
+  - [ ] Add  logging and monitoring for all scheduled tasks
 
 ### **3A.2 Database-Driven Watchlist Integration** ❌
 - [ ] **18-Stock ASX Strategy FastAPI Integration**
@@ -64,26 +64,26 @@ This document tracks incomplete tasks and missing features required to transform
   - [ ] Implement watchlist configuration validation through API endpoints
 
 - [ ] **Real-Time Collection Service** (per `docs/hybrid_architecture_decision.md`)
-  - [ ] Create FastAPI background task for `ProfessionalRealtimeDataService`
+  - [ ] Create FastAPI background task for `RealtimeDataService`
   - [ ] Implement persistent real-time data collection during market hours
   - [ ] Build `DatabaseWatchlistManager` with FastAPI integration
   - [ ] Create `CentralizedRateLimiter` coordinated through FastAPI state
-  - [ ] Add professional service orchestration via FastAPI lifespan events
+  - [ ] Add  service orchestration via FastAPI lifespan events
 
-### **3A.3 Professional Connection & Data Quality** ❌
+### **3A.3  Connection & Data Quality** ❌
 - [ ] **Bulletproof IBKR Integration**
-  - [ ] Implement `ProfessionalConnectionManager` as FastAPI dependency
+  - [ ] Implement `ConnectionManager` as FastAPI dependency
   - [ ] Add connection health monitoring with FastAPI health endpoints
   - [ ] Create connection pool management accessible via API
   - [ ] Build centralized rate limiting coordination through FastAPI middleware
-  - [ ] Add professional error handling with API error responses
+  - [ ] Add  error handling with API error responses
 
-- [ ] **Data Quality & Professional Monitoring**
-  - [ ] Implement `ProfessionalDataValidator` with FastAPI data models
+- [ ] **Data Quality &  Monitoring**
+  - [ ] Implement `DataValidator` with FastAPI data models
   - [ ] Add real-time data quality monitoring via WebSocket endpoints
-  - [ ] Create professional alerting system with API integration
+  - [ ] Create  alerting system with API integration
   - [ ] Build comprehensive KPI tracking accessible via `/api/metrics`
-  - [ ] Add professional logging and audit trails through FastAPI middleware
+  - [ ] Add  logging and audit trails through FastAPI middleware
 
 ---
 
@@ -93,7 +93,7 @@ This document tracks incomplete tasks and missing features required to transform
 
 ### **3B.1 Real-Time Trading Engine** ❌
 - [ ] **Strategy Execution Framework**
-  - [ ] Live market data integration with professional data collection service
+  - [ ] Live market data integration with  data collection service
   - [ ] Real-time signal generation using 18-stock watchlist data
   - [ ] Order placement and execution logic via IBKR API
   - [ ] Position tracking and portfolio management
@@ -145,7 +145,7 @@ This document tracks incomplete tasks and missing features required to transform
 
 ---
 
-## 🎯 Priority 3: Professional Backtesting Features (Phase 3C)
+## 🎯 Priority 3:  Backtesting Features (Phase 3C)
 **Target**: 5-7 days  
 **Status**: 🟡 **HIGH - REQUIRED FOR CREDIBILITY**
 
@@ -193,7 +193,7 @@ This document tracks incomplete tasks and missing features required to transform
   - [ ] Market hours and holiday handling
   - [ ] Corporate action adjustments
 
-### **3B.3 Professional Performance Analytics** ❌
+### **3B.3  Performance Analytics** ❌
 - [ ] **Risk-Adjusted Metrics**
   - [ ] Sharpe ratio optimization
   - [ ] Sortino ratio calculation
@@ -387,7 +387,7 @@ This document tracks incomplete tasks and missing features required to transform
 
 ### **Week 3-4: Advanced Risk & Analytics**
 - Advanced risk management features
-- Professional backtesting capabilities
+-  backtesting capabilities
 - Performance monitoring systems
 - Strategy lifecycle management
 
@@ -418,10 +418,10 @@ This document tracks incomplete tasks and missing features required to transform
 - [ ] Walk-forward analysis prevents overfitting
 - [ ] Monte Carlo provides confidence intervals
 - [ ] Slippage modeling matches real trading costs
-- [ ] Performance metrics match professional standards
+- [ ] Performance metrics match  standards
 - [ ] Backtests accurately predict live performance
 
-### **Professional Grade When:**
+### ** Grade When:**
 - [ ] System handles live trading without manual intervention
 - [ ] Risk controls prevent significant losses
 - [ ] Performance monitoring enables proactive management
@@ -438,7 +438,7 @@ This document tracks incomplete tasks and missing features required to transform
 3. **Order Management**: IBKR integration testing
 4. **Data Strategy**: Implement IBKR free-tier strategy (see `docs/ibkr_free_tier_strategy.md`)
 5. **Stock Selection**: Deploy 18-stock ASX portfolio (see `docs/asx_stock_selection_strategy.md`)
-6. **Professional Data Collection**: Implement `services/data-farmer/professional_data_farmer.py` (see `docs/professional_data_collection_architecture.md`)
+6. ** Data Collection**: Implement `services/data-farmer/_data_farmer.py` (see `docs/_data_collection_architecture.md`)
 
 ### **This Week**
 1. **Strategy Deployment**: Paper trading integration
@@ -446,12 +446,12 @@ This document tracks incomplete tasks and missing features required to transform
 3. **Emergency Controls**: Stop mechanisms
 
 ### **This Month**
-1. **Professional Backtesting**: Walk-forward analysis
+1. ** Backtesting**: Walk-forward analysis
 2. **Advanced Analytics**: Risk-adjusted metrics
 3. **Production Operations**: Monitoring systems
 
 ---
 
-*Status: FOUNDATION COMPLETE - READY FOR PROFESSIONAL FEATURES*  
+*Status: FOUNDATION COMPLETE - READY FOR  FEATURES*  
 *Next Milestone: Live Trading Engine (Phase 3A)*  
-*Target: Transform from development system to professional trading platform*
+*Target: Transform from development system to  trading platform*
