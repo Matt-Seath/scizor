@@ -32,57 +32,58 @@ This document tracks incomplete tasks and missing features required to transform
 - 📋 **18-Stock ASX Strategy**: `docs/asx_stock_selection_strategy.md`
 - 🏗️ **Professional Data Architecture**: `docs/hybrid_architecture_decision.md`
 - 📊 **Professional Implementation**: `docs/professional_data_collection_architecture.md`
+- 🚀 **Collector Service Structure**: `services/collector/` (FastAPI + integrated cron scripts)
 
 ---
 
-## 🎯 Priority 1: Professional Data Collection Implementation (Phase 3A)
+## 🎯 Priority 1: Professional Collector Service Implementation (Phase 3A)
 **Target**: 7-10 days  
 **Status**: 🔴 **CRITICAL - FOUNDATION FOR TRADING**
 
-### **3A.1 Database-Driven Watchlist Implementation** ⭐ **NEW** ❌
-- [ ] **18-Stock ASX Strategy Configuration**
-  - [ ] Implement `populate_asx_professional_watchlist.py` script (per `docs/asx_stock_selection_strategy.md`)
-  - [ ] Create Tier 1 (8 stocks), Tier 2 (6 stocks), Tier 3 (4 stocks) prioritization
-  - [ ] Configure collection timeframes (5min, 1min) per tier in watchlist table
-  - [ ] Set up dynamic priority-based collection ordering
-  - [ ] Implement watchlist configuration validation and testing
+### **3A.1 FastAPI Collector Service Foundation** ⭐ **NEW** ❌
+- [ ] **Professional Collector Service Architecture**
+  - [ ] Create `services/collector/` FastAPI application structure
+  - [ ] Implement high-performance async API endpoints for data collection control
+  - [ ] Build WebSocket endpoints for real-time data streaming
+  - [ ] Create professional health monitoring and metrics endpoints
+  - [ ] Integrate with existing database models and IBKR client infrastructure
 
-- [ ] **Hybrid Architecture Data Collection** (per `docs/hybrid_architecture_decision.md`)
-  - [ ] Create `ProfessionalRealtimeDataService` persistent daemon
-  - [ ] Implement scheduled historical data scripts with file-based locking
-  - [ ] Build `DatabaseWatchlistManager` for dynamic configuration loading
-  - [ ] Create `CentralizedRateLimiter` for IBKR API compliance coordination
-  - [ ] Implement professional service orchestration and health monitoring
+- [ ] **Integrated Cron Scripts** (within collector service)
+  - [ ] Move and enhance existing cron scripts to `services/collector/scripts/`
+  - [ ] Create `services/collector/scripts/historical_collection.py` with professional rate limiting
+  - [ ] Build `services/collector/scripts/daily_collection.py` for EOD data
+  - [ ] Implement `services/collector/scripts/cron_manager.py` for job coordination
+  - [ ] Add professional logging and monitoring for all scheduled tasks
 
-### **3A.2 Professional Connection Management** ❌
+### **3A.2 Database-Driven Watchlist Integration** ❌
+- [ ] **18-Stock ASX Strategy FastAPI Integration**
+  - [ ] Build FastAPI endpoints for watchlist management (`/api/watchlist`)
+  - [ ] Implement dynamic watchlist loading from database (no restarts needed)
+  - [ ] Create Tier 1 (8 stocks), Tier 2 (6 stocks), Tier 3 (4 stocks) API management
+  - [ ] Add priority-based collection ordering via FastAPI background tasks
+  - [ ] Implement watchlist configuration validation through API endpoints
+
+- [ ] **Real-Time Collection Service** (per `docs/hybrid_architecture_decision.md`)
+  - [ ] Create FastAPI background task for `ProfessionalRealtimeDataService`
+  - [ ] Implement persistent real-time data collection during market hours
+  - [ ] Build `DatabaseWatchlistManager` with FastAPI integration
+  - [ ] Create `CentralizedRateLimiter` coordinated through FastAPI state
+  - [ ] Add professional service orchestration via FastAPI lifespan events
+
+### **3A.3 Professional Connection & Data Quality** ❌
 - [ ] **Bulletproof IBKR Integration**
-  - [ ] Implement `ProfessionalConnectionManager` with exponential backoff
-  - [ ] Add connection health monitoring with automatic reconnection
-  - [ ] Create connection pool management for multiple data streams
-  - [ ] Build rate limiting coordination across all services
-  - [ ] Add professional error handling and recovery procedures
+  - [ ] Implement `ProfessionalConnectionManager` as FastAPI dependency
+  - [ ] Add connection health monitoring with FastAPI health endpoints
+  - [ ] Create connection pool management accessible via API
+  - [ ] Build centralized rate limiting coordination through FastAPI middleware
+  - [ ] Add professional error handling with API error responses
 
-- [ ] **Data Quality & Validation**
-  - [ ] Implement `ProfessionalDataValidator` with market hours validation
-  - [ ] Add real-time price sanity checks and anomaly detection
-  - [ ] Create data completeness monitoring with gap detection
-  - [ ] Build professional alerting for data quality issues
-  - [ ] Add tick-to-bar aggregation with validation
-
-### **3A.3 Production Monitoring & Alerting** ❌
-- [ ] **Professional KPI Tracking**
-  - [ ] Implement `ServiceHealthMonitor` with real-time metrics
-  - [ ] Create performance dashboard with data latency tracking
-  - [ ] Add connection uptime monitoring and alerting
-  - [ ] Build rate limit utilization tracking and warnings
-  - [ ] Implement data completeness percentage monitoring
-
-- [ ] **Institutional-Grade Alerting**
-  - [ ] Create `ProfessionalAlertManager` with Slack/email integration
-  - [ ] Add critical alert escalation procedures
-  - [ ] Implement performance degradation warning system
-  - [ ] Build service health check automation
-  - [ ] Add professional logging and audit trails
+- [ ] **Data Quality & Professional Monitoring**
+  - [ ] Implement `ProfessionalDataValidator` with FastAPI data models
+  - [ ] Add real-time data quality monitoring via WebSocket endpoints
+  - [ ] Create professional alerting system with API integration
+  - [ ] Build comprehensive KPI tracking accessible via `/api/metrics`
+  - [ ] Add professional logging and audit trails through FastAPI middleware
 
 ---
 

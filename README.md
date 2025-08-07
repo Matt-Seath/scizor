@@ -1,6 +1,17 @@
 # SCIZOR - Advanced Algorithmic Trading System
 
-A production-ready microservices trading platform with intelligent data collection, comprehensive API framework, and advanced symbol management. Built for scalability with institutional-grade features and proven IBKR integration.
+A production-ready microservices trading platform with intelligent data collection, comprehensive API framework, and advanced symbol management. Built for scalability with institutional-grade featu### API Endpoints
+
+### Collector (Port 8000) - **✅ PROFESSIONAL**
+- `GET /api/symbols` - List tracked symbols with validation status
+- `POST /api/symbols` - Add new symbols with automatic validation  
+- `DELETE /api/symbols/{symbol}` - Remove symbols with cleanup
+- `GET /api/data/{symbol}` - Get historical OHLCV data
+- `POST /api/collect/{symbol}` - Trigger manual data collection
+- `POST /api/collect/historical/{symbol}` - Trigger historical data collection ⭐ **NEW**
+- `GET /api/watchlist` - Manage professional watchlists ⭐ **NEW**
+- `GET /api/health` - Professional service health monitoring ⭐ **NEW**
+- `WS /ws/realtime` - Real-time market data stream ⭐ **NEW**roven IBKR integration.
 
 ## 🚀 Current Status: Foundation Excellence Achieved
 
@@ -69,8 +80,9 @@ A production-ready microservices trading platform with intelligent data collecti
 
 ## Services
 
-### 1. Data Farmer (Port 8000) ✅ **PROFESSIONAL**
+### 1. Collector (Port 8000) ✅ **PROFESSIONAL**
 - **Purpose**: Professional-grade market data collection for day trading
+- **Technology**: FastAPI + asyncio for high-performance real-time data processing
 - **Status**: Production deployment with 18-stock ASX strategy implementation
 - **Architecture**: Hybrid real-time service + scheduled historical collection
 - **Features**: 
@@ -80,6 +92,7 @@ A production-ready microservices trading platform with intelligent data collecti
   - Professional data validation and quality monitoring
   - Centralized rate limiting coordination (IBKR API compliance)
   - Health monitoring with institutional-grade alerting
+  - Integrated cron scripts for scheduled data collection
 
 ### 2. Backtester (Port 8001) ✅ **API READY**
 - **Purpose**: Strategy testing and performance analysis
@@ -171,14 +184,14 @@ For serious day trading with the 18-stock ASX strategy:
 # 1. Initialize professional watchlist (18-stock ASX strategy)
 python scripts/populate_asx_professional_watchlist.py
 
-# 2. Deploy professional data collection architecture
+# 2. Deploy professional collector service
 docker-compose -f docker-compose.professional.yml up -d
 
 # 3. Verify professional monitoring
-python scripts/professional_health_check.py --dashboard
+python services/collector/scripts/professional_health_check.py --dashboard
 
 # 4. Start real-time data collection
-python services/data-farmer/professional_realtime_service.py
+python services/collector/main.py
 ```
 
 ### Professional Monitoring
@@ -205,7 +218,13 @@ python scripts/manage_watchlist.py add --symbol "NEW" --name asx_professional --
 python scripts/manage_watchlist.py update --symbol "CBA" --name asx_professional --priority 1
 
 # Emergency service restart
-docker-compose -f docker-compose.professional.yml restart realtime-data-service
+docker-compose -f docker-compose.professional.yml restart collector-service
+
+# Run historical data collection manually
+python services/collector/scripts/historical_collection.py --watchlist asx_professional
+
+# Check cron job status
+python services/collector/scripts/cron_status.py
 ```
 
 ## Configuration

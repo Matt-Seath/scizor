@@ -30,76 +30,100 @@ After analyzing this like a day-trading professional would approach mission-crit
 
 ## 🏗️ Hybrid Architecture Implementation
 
-### **Component 1: Real-Time Data Collection Service**
-**Purpose**: Persistent service for market hours data collection  
-**Technology**: Python asyncio daemon with database-driven configuration
+### **Component 1: FastAPI Collector Service**
+**Purpose**: High-performance real-time data collection and API management  
+**Technology**: FastAPI + asyncio for professional trading performance
 
 ```python
-# services/data-farmer/realtime_data_service.py
-class ProfessionalRealtimeDataService:
-    """Persistent real-time data collection service."""
+# services/collector/main.py
+from fastapi import FastAPI, BackgroundTasks, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from .services.realtime_collector import ProfessionalRealtimeCollector
+from .services.watchlist_manager import DatabaseWatchlistManager
+from .services.rate_limiter import CentralizedRateLimiter
+
+app = FastAPI(
+    title="SCIZOR Professional Data Collector",
+    description="Institutional-grade market data collection",
+    version="1.0.0"
+)
+
+# Professional background services
+collector_service = ProfessionalRealtimeCollector()
+watchlist_manager = DatabaseWatchlistManager()
+rate_limiter = CentralizedRateLimiter()
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize professional data collection services."""
+    await collector_service.start_professional_collection()
     
-    def __init__(self):
-        self.watchlist_manager = DatabaseWatchlistManager()
-        self.rate_limiter = CentralizedRateLimiter(max_requests_per_minute=5)
-        self.connection_manager = ProfessionalConnectionManager()
-        self.data_validator = RealTimeDataValidator()
-        
-    async def start_market_hours_collection(self):
-        """Start persistent data collection during market hours."""
-        while self.is_market_hours():
-            try:
-                # Load current watchlist from database (no restart needed)
-                active_symbols = await self.watchlist_manager.get_active_symbols()
-                
-                # Manage real-time subscriptions with rate limiting
-                await self.manage_subscriptions(active_symbols)
-                
-                # Process incoming data with validation
-                await self.process_realtime_data()
-                
-                # Health monitoring and alerts
-                await self.monitor_service_health()
-                
-                await asyncio.sleep(1)  # 1-second processing loop
-                
-            except Exception as e:
-                await self.handle_service_error(e)
+@app.websocket("/ws/realtime")
+async def websocket_realtime_data(websocket: WebSocket):
+    """Real-time data streaming for trading interfaces."""
+    await collector_service.stream_realtime_data(websocket)
+
+@app.get("/api/watchlist")
+async def get_professional_watchlist():
+    """Get current professional watchlist configuration."""
+    return await watchlist_manager.get_asx_professional_config()
 ```
 
-### **Component 2: Scheduled Historical Data Scripts**
-**Purpose**: Non-overlapping historical data collection and gap filling  
-**Technology**: Individual Python scripts with file-based locking
+### **Component 2: Integrated Cron Scripts**
+**Purpose**: Scheduled historical data collection and maintenance  
+**Technology**: Enhanced Python scripts within collector service structure
 
 ```python
-# scripts/professional_historical_collection.py
+# services/collector/scripts/historical_collection.py
 class ProfessionalHistoricalCollector:
-    """Scheduled historical data collection with bulletproof locking."""
+    """Integrated historical data collection with FastAPI coordination."""
     
     def __init__(self):
-        self.lock_file = "/tmp/scizor_historical.lock" 
-        self.watchlist_manager = DatabaseWatchlistManager()
-        self.rate_limiter = HistoricalRateLimiter(max_requests_per_10min=50)
+        self.lock_file = "/tmp/scizor_historical.lock"
+        self.api_client = CollectorAPIClient()  # Internal API communication
+        self.rate_limiter = CentralizedRateLimiter()
         
-    async def collect_historical_data(self):
-        """Collect historical data with professional locking."""
+    async def run_scheduled_collection(self):
+        """Professional scheduled collection with API coordination."""
         if self.is_locked():
-            logger.warning("Historical collection already running - exiting")
             return
             
         with self.acquire_lock():
-            # Load watchlist priorities from database
-            symbols = await self.watchlist_manager.get_symbols_by_priority()
+            # Coordinate with main collector service via API
+            watchlist = await self.api_client.get_active_watchlist()
             
-            # Process with strict rate limiting
-            for symbol in symbols:
-                await self.rate_limiter.wait_if_needed()
+            # Use centralized rate limiter
+            for symbol in watchlist:
+                await self.rate_limiter.acquire_historical_slot()
                 await self.collect_symbol_history(symbol)
 ```
 
-### **Component 3: Database-Driven Watchlist Configuration**
-**Purpose**: Dynamic symbol management without code changes  
-**Technology**: PostgreSQL watchlist table with real-time configuration
+### **Component 3: Professional Service Coordination**
+**Purpose**: Unified service management and monitoring  
+**Technology**: FastAPI lifespan events + background task coordination
+
+```python
+# services/collector/services/service_coordinator.py
+class ProfessionalServiceCoordinator:
+    """Coordinates all data collection components through FastAPI."""
+    
+    def __init__(self, app: FastAPI):
+        self.app = app
+        self.realtime_service = ProfessionalRealtimeCollector()
+        self.historical_scheduler = HistoricalCollectionScheduler()
+        self.health_monitor = ServiceHealthMonitor()
+        
+    async def start_professional_operation(self):
+        """Start coordinated professional data collection."""
+        # Start real-time collection as FastAPI background task
+        self.app.add_task(self.realtime_service.run_continuous_collection)
+        
+        # Schedule historical collection
+        self.app.add_task(self.historical_scheduler.run_scheduled_tasks)
+        
+        # Start health monitoring
+        self.app.add_task(self.health_monitor.monitor_all_services)
+```
 
 ```sql
 -- Professional 18-stock ASX portfolio configuration
@@ -128,56 +152,57 @@ WHERE s.symbol IN ('XRO', 'WTC', 'APT', 'ZIP');
 
 ## 🔄 Implementation Strategy
 
-### **Phase 1: Database-Driven Foundation (Week 1)**
+### **Phase 1: FastAPI Collector Foundation (Week 1)**
 
-#### **1.1 Populate 18-Stock ASX Strategy**
+#### **1.1 Professional Collector Service Setup**
 ```bash
-# Create professional watchlist configuration
-python scripts/populate_asx_professional_watchlist.py
+# Create professional collector service structure
+mkdir -p services/collector/{app,scripts,services,tests}
+mkdir -p services/collector/app/{api,core,models}
 
-# Verify configuration
-python scripts/manage_watchlist.py list --name asx_professional
+# Initialize FastAPI application
+touch services/collector/main.py
+touch services/collector/app/{__init__.py,config.py}
+touch services/collector/app/api/{__init__.py,watchlist.py,collection.py,monitoring.py}
 ```
 
-#### **1.2 Enhanced Connection Management**  
+#### **1.2 Professional Service Architecture**  
 ```python
-class ProfessionalConnectionManager:
-    """Bulletproof IBKR connection management."""
+# services/collector/app/core/service_manager.py
+class ProfessionalServiceManager:
+    """Manages all collector services through FastAPI."""
     
     def __init__(self):
-        self.max_retries = 5
-        self.backoff_multiplier = 2
-        self.health_check_interval = 30
-        self.connection_timeout = 60
+        self.connection_manager = ProfessionalConnectionManager()
+        self.watchlist_manager = DatabaseWatchlistManager()
+        self.rate_limiter = CentralizedRateLimiter()
         
-    async def maintain_connection(self):
-        """Continuous connection health monitoring."""
-        while True:
-            if not self.is_connected():
-                await self.reconnect_with_backoff()
-            await asyncio.sleep(self.health_check_interval)
+    async def start_all_services(self):
+        """Start coordinated professional services."""
+        await self.connection_manager.establish_professional_connection()
+        await self.watchlist_manager.load_asx_professional_config()
+        await self.rate_limiter.initialize_coordination()
 ```
 
-#### **1.3 Professional Data Validation**
+#### **1.3 Integrated Cron Scripts Enhancement**
 ```python
-class ProfessionalDataValidator:
-    """Real-time data quality assurance."""
+# services/collector/scripts/cron_coordinator.py
+class CronScriptCoordinator:
+    """Coordinates cron scripts with main collector service."""
     
-    def validate_tick_data(self, tick: TickData) -> bool:
-        """Professional-grade tick validation."""
-        # Price sanity checks
-        if not self.is_price_reasonable(tick.price):
-            return False
-            
-        # Market hours validation
-        if not self.is_market_hours(tick.timestamp):
-            return False
-            
-        # Volume spike detection
-        if self.is_volume_anomaly(tick.volume):
-            self.flag_for_review(tick)
-            
-        return True
+    def __init__(self):
+        self.api_client = InternalCollectorAPI()
+        self.scripts = {
+            'historical': HistoricalCollectionScript(),
+            'daily': DailyCollectionScript(),
+            'maintenance': DatabaseMaintenanceScript()
+        }
+    
+    async def run_coordinated_script(self, script_name: str):
+        """Run script with collector service coordination."""
+        # Check if collector service allows script execution
+        if await self.api_client.can_run_script(script_name):
+            await self.scripts[script_name].execute()
 ```
 
 ### **Phase 2: Service Integration (Week 2)**
@@ -338,25 +363,25 @@ docker-compose -f docker-compose.professional.yml restart realtime-data-service
 
 ## ✅ Implementation Checklist
 
-### **Week 1: Foundation**
-- [ ] Create `populate_asx_professional_watchlist.py` script
-- [ ] Implement `ProfessionalConnectionManager` class
-- [ ] Build `ProfessionalDataValidator` with market hours logic
-- [ ] Create `DatabaseWatchlistManager` for dynamic configuration
-- [ ] Set up professional logging and error handling
+### **Week 1: FastAPI Collector Foundation**
+- [ ] Create `services/collector/` FastAPI application structure
+- [ ] Implement professional async API endpoints for data collection control
+- [ ] Build WebSocket endpoints for real-time data streaming  
+- [ ] Create professional health monitoring and metrics API endpoints
+- [ ] Integrate existing database models and IBKR client with FastAPI dependencies
 
-### **Week 2: Service Integration** 
-- [ ] Implement `ProfessionalRealtimeDataService` daemon
-- [ ] Create professional cron scripts with file locking
-- [ ] Build `ServiceHealthMonitor` with comprehensive KPIs
-- [ ] Implement `ProfessionalAlertManager` with Slack/email integration
-- [ ] Set up monitoring dashboard with real-time metrics
+### **Week 2: Service Integration & Cron Scripts** 
+- [ ] Implement FastAPI background tasks for persistent real-time data collection
+- [ ] Enhance and integrate cron scripts within `services/collector/scripts/`
+- [ ] Build comprehensive KPI monitoring via `/api/metrics` endpoints
+- [ ] Create professional alerting system with API integration
+- [ ] Set up coordinated rate limiting through FastAPI middleware
 
-### **Week 3: Production Readiness**
-- [ ] Professional Docker deployment configuration
-- [ ] Comprehensive testing with 18-stock portfolio
-- [ ] Performance optimization and tuning
-- [ ] Documentation and operational procedures
-- [ ] Production deployment and monitoring setup
+### **Week 3: Production Deployment**
+- [ ] Professional Docker deployment with FastAPI service configuration
+- [ ] Comprehensive API testing with 18-stock portfolio endpoints
+- [ ] FastAPI performance optimization and async middleware tuning
+- [ ] Production monitoring dashboards and operational API procedures
+- [ ] Full integration testing of collector service with existing SCIZOR components
 
 This hybrid architecture provides the reliability and control of a professional trading operation while maintaining the flexibility to adapt to changing market conditions and strategy requirements.
