@@ -340,7 +340,7 @@ class DailyMarketDataCollector:
                     low=float(bar.low),
                     close=float(bar.close),
                     volume=int(bar.volume) if bar.volume != -1 else 0,
-                    wap=float(bar.wap) if bar.wap != -1 else None,
+                    wap=float(bar.wap) if hasattr(bar, 'wap') and bar.wap != -1 else None,
                     bar_count=int(bar.barCount) if hasattr(bar, 'barCount') else 1
                 )
                 

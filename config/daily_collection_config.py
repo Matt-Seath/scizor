@@ -5,7 +5,7 @@ Configuration for Daily Market Data Collection
 
 # IBKR Connection Settings
 IBKR_HOST = "127.0.0.1"
-IBKR_PORTS = [4001, 7497]  # Try Gateway first, then TWS
+IBKR_PORTS = [4002, 4001, 7497]  # Try Paper Trading first, then Gateway, then TWS
 IBKR_CLIENT_ID = 100  # Unique client ID for daily collection
 
 # TWS API Pacing Settings (from TWS API documentation)

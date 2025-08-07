@@ -254,17 +254,15 @@ class IBKRClient(EClient):
     def __init__(self, wrapper: IBKRWrapper):
         super().__init__(wrapper)
         self.wrapper = wrapper
-        self._is_connected = False
         
     def is_connected(self) -> bool:
         """Check if client is connected and ready for requests."""
-        return self._is_connected and self.wrapper.connected and self.wrapper.connection_ready
+        return self.isConnected() and self.wrapper.connected and self.wrapper.connection_ready
         
     def disconnect_and_cleanup(self):
         """Disconnect and cleanup resources."""
-        if self._is_connected:
+        if self.isConnected():
             self.disconnect()
-            self._is_connected = False
             logger.info("IBKR client disconnected")
 
 
