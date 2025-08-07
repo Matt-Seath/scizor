@@ -14,6 +14,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -142,6 +143,14 @@ class CollectionLog(Base):
     end_date = Column(DateTime)
     status = Column(String(20), nullable=False, default="pending")
     error_message = Column(Text)
+    
+    # Enhanced error tracking
+    error_code = Column(Integer)  # IBKR error code (e.g., 200, 162)
+    error_type = Column(String(50))  # categorized error type (e.g., "no_security_definition", "connection", "timeout")
+    ibkr_request_id = Column(Integer)  # IBKR request ID for tracking
+    retry_count = Column(Integer, default=0)  # number of retry attempts
+    error_details = Column(JSON)  # detailed error information (JSON format)
+    
     records_collected = Column(Integer, default=0)
     started_at = Column(DateTime, default=func.now())
     completed_at = Column(DateTime)

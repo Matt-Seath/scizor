@@ -71,6 +71,22 @@ class IntradayDataCollector:
             "start_time": datetime.now()
         }
     
+    def _format_date_with_timezone(self, date: datetime, exchange: str) -> str:
+        """Format date with proper timezone for IBKR API.
+        
+        This prevents IBKR Warning 2174 about missing timezone information.
+        IBKR requires space between date and time: "yyyymmdd hh:mm:ss timezone"
+        
+        Args:
+            date: The date to format
+            exchange: The exchange code to get timezone for
+            
+        Returns:
+            Formatted date string with timezone
+        """
+        timezone = TIMEZONE_MAPPINGS.get(exchange, "UTC")
+        return date.strftime(f"%Y%m%d %H:%M:%S {timezone}")
+    
     async def __aenter__(self):
         """Async context manager entry."""
         await init_db()
@@ -223,10 +239,10 @@ class IntradayDataCollector:
             logger.info(f"Requesting {self.timeframe} bars for {symbol.symbol} "
                        f"from {start_time.date()} to {end_time.date()} (duration: {duration})")
             
-            # Request historical data
+            # Request historical data with timezone-aware formatting
             bars = await self.ibkr_manager.get_historical_data(
                 contract=contract,
-                end_date=end_time.strftime("%Y%m%d %H:%M:%S"),
+                end_date=self._format_date_with_timezone(end_time, symbol.exchange),
                 duration=duration,
                 bar_size=self.timeframe_config["bar_size"],
                 what_to_show=self.timeframe_config["what_to_show"],

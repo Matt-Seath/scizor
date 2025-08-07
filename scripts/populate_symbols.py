@@ -534,6 +534,12 @@ async def populate_symbols():
 
 async def main():
     """Main execution function."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Populate SCIZOR symbols table with ASX200, NASDAQ, and ETF symbols')
+    parser.add_argument('--force', action='store_true', help='Skip symbol validation after population')
+    args = parser.parse_args()
+    
     try:
         result = await populate_symbols()
         
@@ -547,6 +553,55 @@ async def main():
         print(f"✨ Newly Added: {result['added']}")
         print(f"💾 Total in Database: {result['final_count']}")
         print("="*60)
+        
+        # Run symbol validation and cleanup if new symbols were added and not forced to skip
+        if result['added'] > 0 and not args.force:
+            print("🔍 Running symbol validation to verify new symbols...")
+            print("="*60)
+            
+            # Import and run the validation
+            try:
+                from validate_symbols import SymbolValidator
+                
+                async with SymbolValidator() as validator:
+                    await validator.validate_all_symbols()
+                    
+                    # Remove invalid symbols automatically
+                    if validator.invalid_symbols:
+                        logger.warning(f"⚠️  Found {len(validator.invalid_symbols)} invalid symbols, removing them...")
+                        await validator.remove_invalid_symbols()
+                        
+                        # Get updated final count
+                        async with AsyncSessionLocal() as session:
+                            final_result = await session.execute(select(Symbol))
+                            updated_final_count = len(final_result.scalars().all())
+                        
+                        print(f"🗑️  Removed {len(validator.invalid_symbols)} invalid symbols")
+                        print(f"💾 Final Database Count: {updated_final_count}")
+                        print(f"✅ Valid symbols: {len(validator.valid_symbols)}")
+                        
+                        if validator.invalid_symbols:
+                            print("❌ Removed invalid symbols:")
+                            for symbol in validator.invalid_symbols:
+                                print(f"   • {symbol}")
+                    else:
+                        print("✅ All symbols are valid!")
+                        
+                print("="*60)
+                print("🎉 Symbol population and validation complete!")
+                        
+            except ImportError:
+                logger.warning("⚠️  Could not import validate_symbols module for cleanup")
+                print("💡 Run 'python scripts/validate_symbols.py' manually to validate symbols")
+            except Exception as e:
+                logger.warning(f"⚠️  Symbol validation failed: {e}")
+                print("💡 Run 'python scripts/validate_symbols.py' manually to validate symbols")
+        elif result['added'] > 0 and args.force:
+            print("⏭️  Skipping validation due to --force flag")
+            print("💡 Run 'python scripts/validate_symbols.py' manually to validate symbols")
+        else:
+            print("✅ No new symbols added - skipping validation")
+        
         print("✅ Ready for data collection configuration!")
         
     except Exception as e:

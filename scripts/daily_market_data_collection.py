@@ -32,6 +32,7 @@ from shared.ibkr.client import IBKRManager
 from shared.database.connection import init_db, AsyncSessionLocal
 from shared.database.models import Symbol, MarketData, SecurityType, CollectionLog
 from shared.ibkr.contracts import create_stock_contract
+from shared.utils.error_analysis import ErrorAnalyzer
 from config.daily_collection_config import *
 from sqlalchemy import select, and_, desc
 from sqlalchemy.exc import IntegrityError
@@ -77,6 +78,22 @@ class DailyMarketDataCollector:
         self.max_requests_per_batch = MAX_REQUESTS_PER_BATCH
         self.batch_delay_seconds = BATCH_DELAY_SECONDS
         self.request_delay_seconds = REQUEST_DELAY_SECONDS
+    
+    def _format_date_with_timezone(self, date: datetime, exchange: str) -> str:
+        """Format date with proper timezone for IBKR API.
+        
+        This prevents IBKR Warning 2174 about missing timezone information.
+        IBKR requires space between date and time: "yyyymmdd hh:mm:ss timezone"
+        
+        Args:
+            date: The date to format
+            exchange: The exchange code to get timezone for
+            
+        Returns:
+            Formatted date string with timezone
+        """
+        timezone = TIMEZONE_MAPPINGS.get(exchange, "UTC")
+        return date.strftime(f"%Y%m%d 23:59:59 {timezone}")
         
     async def collect_daily_data(self, target_date: Optional[datetime] = None) -> bool:
         """Main method to collect daily market data for all symbols.
@@ -233,17 +250,33 @@ class DailyMarketDataCollector:
                 # Create log entry
                 log_id = await self._create_collection_log(symbol.id, target_date)
                 
-                # Request historical data
-                success = await self._request_historical_data(symbol, target_date)
+                # Request historical data with enhanced error tracking
+                success, error_info = await self._request_historical_data(symbol, target_date)
                 
                 if success:
                     self.collection_stats["successful_collections"] += 1
-                    await self._update_collection_log(log_id, "completed", None)
+                    await self._update_collection_log(log_id, "completed")
                     logger.info(f"✅ Successfully collected data for {symbol.symbol}")
                 else:
                     self.collection_stats["failed_collections"] += 1
-                    await self._update_collection_log(log_id, "failed", "Data request failed")
-                    logger.error(f"❌ Failed to collect data for {symbol.symbol}")
+                    
+                    # Extract error details for enhanced logging
+                    error_message = error_info.get("error_message", "Data request failed") if error_info else "Data request failed"
+                    error_code = error_info.get("error_code") if error_info else None
+                    request_id = error_info.get("request_id") if error_info else None
+                    
+                    await self._update_collection_log(
+                        log_id=log_id,
+                        status="failed", 
+                        error_message=error_message,
+                        error_code=error_code,
+                        ibkr_request_id=request_id,
+                        error_details=error_info
+                    )
+                    
+                    logger.error(f"❌ Failed to collect data for {symbol.symbol}: {error_message}")
+                    if error_code:
+                        logger.error(f"   🔍 IBKR Error Code: {error_code}")
                 
                 # Small delay between requests
                 await asyncio.sleep(self.request_delay_seconds)
@@ -255,21 +288,22 @@ class DailyMarketDataCollector:
         batch_duration = (datetime.now() - batch_start_time).total_seconds()
         logger.info(f"📦 Batch completed in {batch_duration:.1f} seconds")
     
-    async def _request_historical_data(self, symbol: Symbol, target_date: datetime) -> bool:
-        """Request historical data for a single symbol."""
+    async def _request_historical_data(self, symbol: Symbol, target_date: datetime) -> Tuple[bool, Optional[dict]]:
+        """Request historical data for a single symbol and return success status and error details."""
         try:
             # Create appropriate contract
             contract = self._create_contract_for_symbol(symbol)
             
-            # Format end date (TWS expects YYYYMMDD HH:MM:SS format)
-            end_date_str = target_date.strftime("%Y%m%d 23:59:59")
+            # Format end date with proper timezone (IBKR requirement)
+            # Use market-specific timezone to avoid IBKR Warning 2174
+            end_date_str = self._format_date_with_timezone(target_date, symbol.exchange)
             
             # Request historical data
             request_id = self.request_id_counter
             self.request_id_counter += 1
             self.pending_requests[request_id] = symbol
             
-            logger.debug(f"📡 Requesting historical data for {symbol.symbol} (req_id: {request_id})")
+            logger.debug(f"📡 Requesting historical data for {symbol.symbol} (req_id: {request_id}) with timezone: {end_date_str}")
             
             # Use the historical data method from IBKR manager
             bars = await self.ibkr_manager.get_historical_data(
@@ -283,17 +317,59 @@ class DailyMarketDataCollector:
                 timeout=REQUEST_TIMEOUT
             )
             
+            # Check for IBKR errors during request
+            error_info = await self._check_for_ibkr_errors(request_id, symbol)
+            if error_info:
+                logger.warning(f"⚠️  IBKR error for {symbol.symbol}: {error_info}")
+                return False, error_info
+            
             if bars and len(bars) > 0:
                 # Store the data
                 await self._store_market_data(symbol, bars[0], target_date)
-                return True
+                return True, None
             else:
                 logger.warning(f"⚠️  No data returned for {symbol.symbol}")
-                return False
+                return False, {
+                    "error_type": "NO_DATA",
+                    "error_message": "No historical data returned",
+                    "error_code": None,
+                    "request_id": request_id
+                }
                 
         except Exception as e:
+            error_info = {
+                "error_type": "EXCEPTION",
+                "error_message": str(e),
+                "error_code": None,
+                "request_id": None
+            }
             logger.error(f"❌ Error requesting data for {symbol.symbol}: {str(e)}")
-            return False
+            return False, error_info
+    
+    async def _check_for_ibkr_errors(self, request_id: int, symbol: Symbol) -> Optional[dict]:
+        """Check for IBKR errors related to a specific request."""
+        try:
+            # Wait briefly for any errors to be reported
+            await asyncio.sleep(0.5)
+            
+            # Check for errors in the IBKR client
+            error = await self.ibkr_manager.get_error()
+            if error:
+                # Check if error is related to our request
+                if error.get("reqId") == request_id or error.get("reqId") == -1:
+                    return {
+                        "error_type": "IBKR_ERROR",
+                        "error_message": error.get("errorString", "Unknown IBKR error"),
+                        "error_code": error.get("errorCode"),
+                        "request_id": request_id,
+                        "symbol": symbol.symbol,
+                        "timestamp": error.get("timestamp")
+                    }
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Error checking for IBKR errors: {str(e)}")
+            return None
     
     def _create_contract_for_symbol(self, symbol: Symbol) -> Contract:
         """Create appropriate IBKR contract for a symbol."""
@@ -405,8 +481,10 @@ class DailyMarketDataCollector:
             logger.error(f"❌ Error creating collection log: {str(e)}")
             return None
     
-    async def _update_collection_log(self, log_id: int, status: str, error_message: Optional[str]):
-        """Update collection log status."""
+    async def _update_collection_log(self, log_id: int, status: str, error_message: Optional[str] = None,
+                                   error_code: Optional[int] = None, error_details: Optional[dict] = None,
+                                   ibkr_request_id: Optional[int] = None, retry_count: int = 0):
+        """Update collection log status with enhanced error tracking."""
         if log_id is None:
             return
             
@@ -417,6 +495,29 @@ class DailyMarketDataCollector:
                     log_entry.status = status
                     log_entry.error_message = error_message
                     log_entry.completed_at = datetime.now()
+                    log_entry.retry_count = retry_count
+                    
+                    # Enhanced error tracking
+                    if error_code:
+                        log_entry.error_code = error_code
+                        
+                    if ibkr_request_id:
+                        log_entry.ibkr_request_id = ibkr_request_id
+                        
+                    # Analyze and categorize error
+                    if error_code or error_message:
+                        error_analysis = ErrorAnalyzer.analyze_error(
+                            error_code=error_code,
+                            error_message=error_message,
+                            request_id=ibkr_request_id
+                        )
+                        log_entry.error_type = error_analysis.get("error_type")
+                        log_entry.error_details = error_analysis
+                        
+                        # Log detailed error summary
+                        error_summary = ErrorAnalyzer.format_error_summary(error_analysis)
+                        logger.warning(f"📊 Error Analysis: {error_summary}")
+                    
                     if status == "completed":
                         log_entry.records_collected = 1
                     

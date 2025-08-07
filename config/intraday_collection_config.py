@@ -142,3 +142,16 @@ EXCHANGE_PRIORITIES = {
 EMERGENCY_STOP_FILE = "/tmp/stop_intraday_collection"
 MAX_MEMORY_USAGE_MB = 512  # Stop collection if memory usage exceeds this
 MAX_DISK_USAGE_PCT = 90    # Stop collection if disk usage exceeds this percentage
+
+# Timezone Mappings for IBKR Date Formatting
+# IBKR expects timezone-aware date strings to avoid deprecation warnings
+TIMEZONE_MAPPINGS = {
+    "ASX": "Australia/Sydney",
+    "NASDAQ": "US/Eastern", 
+    "NYSE": "US/Eastern",
+    "LSE": "Europe/London",
+    "TSE": "Asia/Tokyo",
+    "HKEX": "Asia/Hong_Kong",
+    "EURONEXT": "Europe/Paris",
+    "TSX": "America/Toronto"
+}

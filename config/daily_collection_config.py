@@ -37,18 +37,64 @@ EXCHANGE_MAPPINGS = {
     "ASX": {
         "exchange": "ASX",
         "primary_exchange": "ASX",
-        "currency": "AUD"
+        "currency": "AUD",
+        "timezone": "Australia/Sydney"
     },
     "NASDAQ": {
         "exchange": "SMART",
         "primary_exchange": "NASDAQ", 
-        "currency": "USD"
+        "currency": "USD",
+        "timezone": "US/Eastern"
     },
     "NYSE": {
         "exchange": "SMART",
         "primary_exchange": "NYSE",
-        "currency": "USD"
+        "currency": "USD",
+        "timezone": "US/Eastern"
+    },
+    "LSE": {
+        "exchange": "SMART",
+        "primary_exchange": "LSE",
+        "currency": "GBP",
+        "timezone": "Europe/London"
+    },
+    "TSE": {
+        "exchange": "SMART",
+        "primary_exchange": "TSE",
+        "currency": "JPY",
+        "timezone": "Asia/Tokyo"
+    },
+    "HKEX": {
+        "exchange": "SMART",
+        "primary_exchange": "SEHK",
+        "currency": "HKD",
+        "timezone": "Asia/Hong_Kong"
+    },
+    "EURONEXT": {
+        "exchange": "SMART",
+        "primary_exchange": "EURONEXT",
+        "currency": "EUR",
+        "timezone": "Europe/Paris"
+    },
+    "TSX": {
+        "exchange": "SMART",
+        "primary_exchange": "TSE",
+        "currency": "CAD",
+        "timezone": "America/Toronto"
     }
+}
+
+# Timezone Mappings for IBKR Date Formatting
+# IBKR expects timezone-aware date strings to avoid deprecation warnings
+TIMEZONE_MAPPINGS = {
+    "ASX": "Australia/Sydney",
+    "NASDAQ": "US/Eastern", 
+    "NYSE": "US/Eastern",
+    "LSE": "Europe/London",
+    "TSE": "Asia/Tokyo",
+    "HKEX": "Asia/Hong_Kong",
+    "EURONEXT": "Europe/Paris",
+    "TSX": "America/Toronto"
 }
 
 # Security Type Mappings
