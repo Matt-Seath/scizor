@@ -41,6 +41,7 @@ A production-ready microservices trading platform with intelligent data collecti
 ### **Data Collection System** ✅ **LIVE**
 - **309 Symbols**: Complete ASX 200, NASDAQ top 105, and 52 major ETFs
 - **Daily OHLCV Collection**: Automated collection with IBKR TWS API integration
+- **Historical Data Collection**: Multi-year symbol history with intelligent chunking ⭐ **NEW**
 - **Smart Validation**: 90-day verification caching reduces API calls by 90%
 - **Data Quality**: Validated price relationships with integrity constraints
 - **Operational Status**: Production-ready with comprehensive error handling
@@ -65,6 +66,7 @@ A production-ready microservices trading platform with intelligent data collecti
 - **Status**: Live data collection for 309 symbols with smart validation
 - **Features**: 
   - Daily OHLCV data collection from IBKR
+  - Historical symbol data collection (multi-year ranges) ⭐ **NEW**
   - Smart symbol validation with 90-day caching
   - Real-time data streaming capabilities
   - Advanced error handling and recovery
@@ -142,6 +144,12 @@ python scripts/validate_symbols.py --force-revalidate
 
 # Manual data collection
 python scripts/daily_market_data_collection.py
+
+# Historical data collection for specific symbols (3 years default)
+python scripts/historical_symbol_data_collection.py AAPL
+
+# Custom date range historical collection
+python scripts/historical_symbol_data_collection.py AAPL --start-date 2022-01-01 --end-date 2023-12-31
 ```
 
 ## Configuration
@@ -179,6 +187,7 @@ MAX_WORKERS=4
 - `DELETE /api/symbols/{symbol}` - Remove symbols with cleanup
 - `GET /api/data/{symbol}` - Get historical OHLCV data
 - `POST /api/collect/{symbol}` - Trigger manual data collection
+- `POST /api/collect/historical/{symbol}` - Trigger historical data collection ⭐ **NEW**
 - `GET /api/health` - Service health and data collection status
 
 ### Backtester (Port 8001) - **✅ API READY**
@@ -235,6 +244,7 @@ scizor/
 │   ├── populate_symbols.py      # ✅ Symbol population with --force
 │   ├── validate_symbols.py      # ✅ Smart validation with 90-day caching
 │   ├── daily_market_data_collection.py  # ✅ Production data collection
+│   ├── historical_symbol_data_collection.py  # ✅ Historical data collection ⭐ NEW
 │   └── test_daily_collection.py # ✅ Testing framework
 ├── docs/               # ✅ Comprehensive documentation
 ├── tests/              # 🟡 Testing framework (expandable)
