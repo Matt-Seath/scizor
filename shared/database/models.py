@@ -99,6 +99,7 @@ class Symbol(Base):
     market_data = relationship("MarketData", back_populates="symbol")
     trades = relationship("Trade", back_populates="symbol")
     positions = relationship("Position", back_populates="symbol")
+    watchlist_entries = relationship("Watchlist", back_populates="symbol")
     
     def __repr__(self):
         return f"<Symbol(symbol='{self.symbol}', name='{self.company_name}', exchange='{self.exchange}')>"
@@ -144,6 +145,33 @@ class CollectionLog(Base):
     records_collected = Column(Integer, default=0)
     started_at = Column(DateTime, default=func.now())
     completed_at = Column(DateTime)
+
+
+# Watchlist for tracking specific symbols for intraday data
+class Watchlist(Base):
+    """Track symbols for enhanced data collection (5min bars, etc.)."""
+    
+    __tablename__ = "watchlist"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    symbol_id = Column(Integer, ForeignKey("symbols.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)  # watchlist name/category
+    priority = Column(Integer, default=1)  # collection priority (1=highest)
+    collect_5min = Column(Boolean, default=True)  # collect 5min bars
+    collect_1min = Column(Boolean, default=False)  # collect 1min bars
+    collect_tick = Column(Boolean, default=False)  # collect tick data
+    start_date = Column(DateTime, default=func.now())  # when to start collecting
+    end_date = Column(DateTime)  # when to stop (null = indefinite)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    notes = Column(Text)  # user notes about why this symbol is watched
+    
+    # Relationships
+    symbol = relationship("Symbol", back_populates="watchlist_entries")
+    
+    def __repr__(self):
+        return f"<Watchlist(symbol='{self.symbol.symbol}', name='{self.name}', priority={self.priority})>"
 
 
 # IBKR connection monitoring
