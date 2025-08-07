@@ -508,3 +508,88 @@ class IBKRManager:
         else:
             logger.warning(f"Timeout waiting for contract details for {contract.symbol} (reqId: {req_id})")
             return None
+
+    async def get_historical_data(self, contract: Contract, end_date: str, duration: str = "1 D", 
+                                 bar_size: str = "1 day", what_to_show: str = "TRADES", 
+                                 use_rth: bool = True, format_date: int = 1, 
+                                 timeout: float = 30.0) -> Optional[List]:
+        """Get historical data for a contract.
+        
+        Args:
+            contract: IBKR contract object
+            end_date: End date for data (format: "YYYYMMDD HH:MM:SS")
+            duration: Duration string (e.g., "1 D", "1 W", "1 M")
+            bar_size: Bar size (e.g., "1 day", "1 hour", "1 min")
+            what_to_show: Data type ("TRADES", "MIDPOINT", "BID", "ASK")
+            use_rth: Use regular trading hours only
+            format_date: Date format (1 for string, 2 for Unix timestamp)
+            timeout: Timeout in seconds
+            
+        Returns:
+            List of BarData objects or None if failed
+        """
+        if not self.is_connected():
+            logger.error("Not connected to IBKR API")
+            return None
+        
+        # Enforce request pacing (minimum 50ms between requests)
+        current_time = time.time()
+        time_since_last = current_time - self._last_request_time
+        if time_since_last < 0.05:  # 50ms minimum
+            await asyncio.sleep(0.05 - time_since_last)
+        
+        # Generate unique req_id
+        req_id = int(time.time() * 1000) % 100000 + 2000  # Different range from contract details
+        
+        # Clear any existing data for this request
+        if req_id in self.wrapper.historical_data:
+            del self.wrapper.historical_data[req_id]
+        
+        logger.info(f"Requesting historical data for {contract.symbol} (reqId: {req_id})")
+        
+        try:
+            # Request historical data
+            self.client.reqHistoricalData(
+                reqId=req_id,
+                contract=contract,
+                endDateTime=end_date,
+                durationStr=duration,
+                barSizeSetting=bar_size,
+                whatToShow=what_to_show,
+                useRTH=use_rth,
+                formatDate=format_date,
+                keepUpToDate=False,
+                chartOptions=[]
+            )
+            
+            self._last_request_time = time.time()
+            
+            # Wait for historical data end signal
+            start_time = time.time()
+            data_complete = False
+            
+            while not data_complete and (time.time() - start_time) < timeout:
+                await asyncio.sleep(0.1)
+                
+                # Check for data completion through the data queue
+                try:
+                    while True:
+                        data = self.wrapper.data_queue.get_nowait()
+                        if (data.get("type") == "historical_data_end" and 
+                            data.get("reqId") == req_id):
+                            data_complete = True
+                            break
+                except:
+                    pass  # Queue empty, continue waiting
+            
+            if data_complete and req_id in self.wrapper.historical_data:
+                bars = self.wrapper.historical_data[req_id]
+                logger.info(f"Successfully received {len(bars)} historical bars for {contract.symbol}")
+                return bars
+            else:
+                logger.warning(f"Timeout or no data received for {contract.symbol} (reqId: {req_id})")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error requesting historical data for {contract.symbol}: {str(e)}")
+            return None
