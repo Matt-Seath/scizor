@@ -20,23 +20,81 @@ This document tracks incomplete tasks and missing features required to transform
 - ✅ Basic backtesting capability
 
 ### **Critical Gaps for Professional Use** ❌
+- ❌ Professional data collection implementation (see `docs/hybrid_architecture_decision.md`)
+- ❌ Database-driven 18-stock ASX strategy deployment
 - ❌ Live trading engine implementation
 - ❌ Advanced risk management systems
 - ❌ Professional-grade backtesting features
 - ❌ Real-time performance monitoring
 - ❌ Production-ready execution modeling
 
+### **Key Strategic Documents** 📚
+- 📋 **18-Stock ASX Strategy**: `docs/asx_stock_selection_strategy.md`
+- 🏗️ **Professional Data Architecture**: `docs/hybrid_architecture_decision.md`
+- 📊 **Professional Implementation**: `docs/professional_data_collection_architecture.md`
+
 ---
 
-## 🎯 Priority 1: Live Trading Engine (Phase 3A)
+## 🎯 Priority 1: Professional Data Collection Implementation (Phase 3A)
 **Target**: 7-10 days  
-**Status**: 🔴 **CRITICAL - BLOCKS PRODUCTION USE**
+**Status**: 🔴 **CRITICAL - FOUNDATION FOR TRADING**
 
-### **3A.1 Real-Time Trading Engine** ❌
+### **3A.1 Database-Driven Watchlist Implementation** ⭐ **NEW** ❌
+- [ ] **18-Stock ASX Strategy Configuration**
+  - [ ] Implement `populate_asx_professional_watchlist.py` script (per `docs/asx_stock_selection_strategy.md`)
+  - [ ] Create Tier 1 (8 stocks), Tier 2 (6 stocks), Tier 3 (4 stocks) prioritization
+  - [ ] Configure collection timeframes (5min, 1min) per tier in watchlist table
+  - [ ] Set up dynamic priority-based collection ordering
+  - [ ] Implement watchlist configuration validation and testing
+
+- [ ] **Hybrid Architecture Data Collection** (per `docs/hybrid_architecture_decision.md`)
+  - [ ] Create `ProfessionalRealtimeDataService` persistent daemon
+  - [ ] Implement scheduled historical data scripts with file-based locking
+  - [ ] Build `DatabaseWatchlistManager` for dynamic configuration loading
+  - [ ] Create `CentralizedRateLimiter` for IBKR API compliance coordination
+  - [ ] Implement professional service orchestration and health monitoring
+
+### **3A.2 Professional Connection Management** ❌
+- [ ] **Bulletproof IBKR Integration**
+  - [ ] Implement `ProfessionalConnectionManager` with exponential backoff
+  - [ ] Add connection health monitoring with automatic reconnection
+  - [ ] Create connection pool management for multiple data streams
+  - [ ] Build rate limiting coordination across all services
+  - [ ] Add professional error handling and recovery procedures
+
+- [ ] **Data Quality & Validation**
+  - [ ] Implement `ProfessionalDataValidator` with market hours validation
+  - [ ] Add real-time price sanity checks and anomaly detection
+  - [ ] Create data completeness monitoring with gap detection
+  - [ ] Build professional alerting for data quality issues
+  - [ ] Add tick-to-bar aggregation with validation
+
+### **3A.3 Production Monitoring & Alerting** ❌
+- [ ] **Professional KPI Tracking**
+  - [ ] Implement `ServiceHealthMonitor` with real-time metrics
+  - [ ] Create performance dashboard with data latency tracking
+  - [ ] Add connection uptime monitoring and alerting
+  - [ ] Build rate limit utilization tracking and warnings
+  - [ ] Implement data completeness percentage monitoring
+
+- [ ] **Institutional-Grade Alerting**
+  - [ ] Create `ProfessionalAlertManager` with Slack/email integration
+  - [ ] Add critical alert escalation procedures
+  - [ ] Implement performance degradation warning system
+  - [ ] Build service health check automation
+  - [ ] Add professional logging and audit trails
+
+---
+
+## 🎯 Priority 2: Live Trading Engine (Phase 3B)
+**Target**: 7-10 days  
+**Status**: 🟡 **DEPENDS ON 3A COMPLETION**
+
+### **3B.1 Real-Time Trading Engine** ❌
 - [ ] **Strategy Execution Framework**
-  - [ ] Live market data integration with IBKR (implement 15-20 stock strategy per `docs/ibkr_free_tier_strategy.md`)
-  - [ ] Real-time signal generation and processing
-  - [ ] Order placement and execution logic
+  - [ ] Live market data integration with professional data collection service
+  - [ ] Real-time signal generation using 18-stock watchlist data
+  - [ ] Order placement and execution logic via IBKR API
   - [ ] Position tracking and portfolio management
   - [ ] Performance monitoring with backtest comparison
 
@@ -54,7 +112,7 @@ This document tracks incomplete tasks and missing features required to transform
   - [ ] Cash management and margin tracking
   - [ ] Multi-strategy allocation management
 
-### **3A.2 Advanced Risk Management** ❌
+### **3B.2 Advanced Risk Management** ❌
 - [ ] **Pre-Trade Risk Controls**
   - [ ] Position size validation against limits
   - [ ] Portfolio exposure limits (single position, sector, total)
@@ -69,14 +127,7 @@ This document tracks incomplete tasks and missing features required to transform
   - [ ] Risk alerts and notification system
   - [ ] Emergency stop mechanisms (manual + automatic)
 
-- [ ] **Risk Reporting & Analytics**
-  - [ ] Real-time risk dashboard
-  - [ ] VaR (Value at Risk) calculations
-  - [ ] Risk attribution by strategy/position
-  - [ ] Stress testing scenarios
-  - [ ] Regulatory compliance reporting
-
-### **3A.3 Strategy Lifecycle Management** ❌
+### **3B.3 Strategy Lifecycle Management** ❌
 - [ ] **Deployment Pipeline**
   - [ ] Strategy validation before deployment
   - [ ] Paper trading integration for new strategies
@@ -93,7 +144,7 @@ This document tracks incomplete tasks and missing features required to transform
 
 ---
 
-## 🎯 Priority 2: Professional Backtesting Features (Phase 3B)
+## 🎯 Priority 3: Professional Backtesting Features (Phase 3C)
 **Target**: 5-7 days  
 **Status**: 🟡 **HIGH - REQUIRED FOR CREDIBILITY**
 
@@ -385,6 +436,8 @@ This document tracks incomplete tasks and missing features required to transform
 2. **Risk Management**: Define risk parameters  
 3. **Order Management**: IBKR integration testing
 4. **Data Strategy**: Implement IBKR free-tier strategy (see `docs/ibkr_free_tier_strategy.md`)
+5. **Stock Selection**: Deploy 18-stock ASX portfolio (see `docs/asx_stock_selection_strategy.md`)
+6. **Professional Data Collection**: Implement `services/data-farmer/professional_data_farmer.py` (see `docs/professional_data_collection_architecture.md`)
 
 ### **This Week**
 1. **Strategy Deployment**: Paper trading integration

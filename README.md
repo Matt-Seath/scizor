@@ -46,8 +46,16 @@ A production-ready microservices trading platform with intelligent data collecti
 - **Data Quality**: Validated price relationships with integrity constraints
 - **Operational Status**: Production-ready with comprehensive error handling
 
+### **Professional Trading Architecture** ⭐ **NEW** 
+- **18-Stock ASX Strategy**: Optimized portfolio for IBKR free-tier constraints ([Strategy Details](docs/asx_stock_selection_strategy.md))
+- **Hybrid Data Collection**: Persistent real-time service + scheduled historical scripts ([Architecture](docs/hybrid_architecture_decision.md))
+- **Database-Driven Configuration**: Dynamic watchlist management without service restarts
+- **Professional Rate Limiting**: Bulletproof IBKR API compliance with centralized coordination
+- **Institutional Monitoring**: Real-time KPIs, health checks, and professional alerting
+
 ### **Symbol Management** ✅ **ENHANCED** 
 - **Intelligent Caching**: Skip recently verified symbols (90-day window)
+- **Watchlist Integration**: Database-driven symbol selection with priority ordering
 - **Force Flags**: `--force` for population, `--force-revalidate` for validation
 - **Last Verified Tracking**: Database tracks validation timestamps
 - **Automatic Cleanup**: Invalid symbols automatically removed
@@ -61,15 +69,17 @@ A production-ready microservices trading platform with intelligent data collecti
 
 ## Services
 
-### 1. Data Farmer (Port 8000) ✅ **OPERATIONAL**
-- **Purpose**: Production market data collection and symbol management
-- **Status**: Live data collection for 309 symbols with smart validation
+### 1. Data Farmer (Port 8000) ✅ **PROFESSIONAL**
+- **Purpose**: Professional-grade market data collection for day trading
+- **Status**: Production deployment with 18-stock ASX strategy implementation
+- **Architecture**: Hybrid real-time service + scheduled historical collection
 - **Features**: 
-  - Daily OHLCV data collection from IBKR
-  - Historical symbol data collection (multi-year ranges) ⭐ **NEW**
-  - Smart symbol validation with 90-day caching
-  - Real-time data streaming capabilities
-  - Advanced error handling and recovery
+  - Real-time 5min bars during market hours (database-driven watchlist)
+  - Historical data backfill with professional rate limiting
+  - Bulletproof connection management with auto-reconnection
+  - Professional data validation and quality monitoring
+  - Centralized rate limiting coordination (IBKR API compliance)
+  - Health monitoring with institutional-grade alerting
 
 ### 2. Backtester (Port 8001) ✅ **API READY**
 - **Purpose**: Strategy testing and performance analysis
@@ -150,6 +160,52 @@ python scripts/historical_symbol_data_collection.py AAPL
 
 # Custom date range historical collection
 python scripts/historical_symbol_data_collection.py AAPL --start-date 2022-01-01 --end-date 2023-12-31
+```
+
+## Professional Trading Setup ⭐ **NEW**
+
+For serious day trading with the 18-stock ASX strategy:
+
+### Professional Deployment
+```bash
+# 1. Initialize professional watchlist (18-stock ASX strategy)
+python scripts/populate_asx_professional_watchlist.py
+
+# 2. Deploy professional data collection architecture
+docker-compose -f docker-compose.professional.yml up -d
+
+# 3. Verify professional monitoring
+python scripts/professional_health_check.py --dashboard
+
+# 4. Start real-time data collection
+python services/data-farmer/professional_realtime_service.py
+```
+
+### Professional Monitoring
+```bash
+# Real-time performance dashboard
+curl http://localhost:8000/api/professional/dashboard
+
+# Check data collection KPIs
+curl http://localhost:8000/api/professional/kpis
+
+# View watchlist configuration
+python scripts/manage_watchlist.py list --name asx_professional
+
+# Monitor service health
+curl http://localhost:8000/api/professional/health
+```
+
+### Professional Operations
+```bash
+# Add new stock to professional watchlist
+python scripts/manage_watchlist.py add --symbol "NEW" --name asx_professional --priority 2
+
+# Update stock priority  
+python scripts/manage_watchlist.py update --symbol "CBA" --name asx_professional --priority 1
+
+# Emergency service restart
+docker-compose -f docker-compose.professional.yml restart realtime-data-service
 ```
 
 ## Configuration
