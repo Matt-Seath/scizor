@@ -14,7 +14,7 @@ class Signal(Base):
     signal_type = Column(String(10), nullable=False)  # BUY, SELL, CLOSE
     price = Column(DECIMAL(12, 4), nullable=False)
     confidence = Column(DECIMAL(5, 4), nullable=False)
-    metadata = Column(JSONB)
+    signal_metadata = Column(JSONB)
     generated_at = Column(DateTime, nullable=False)
     executed_at = Column(DateTime)
     status = Column(String(20), default='PENDING')  # PENDING, EXECUTED, CANCELLED, EXPIRED

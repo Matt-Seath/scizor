@@ -15,34 +15,27 @@ class MomentumBreakoutParameters(StrategyParameters):
     """Parameters specific to momentum breakout strategy"""
     
     def __init__(self, **kwargs):
-        # Default momentum-specific parameters
-        defaults = {
+        # Base strategy parameters
+        base_params = {
             'name': 'momentum_breakout',
-            'lookback_period': 20,
-            'volume_multiplier': 1.5,
-            'rsi_threshold': 50,
-            'price_change_threshold': 0.02,  # 2% minimum price change
-            'atr_expansion_threshold': 1.2,  # ATR should be 20% above average
-            'min_confidence': 0.7,
-            'max_positions': 3,
-            'risk_per_trade': 0.02,
-            'stop_loss_method': 'atr',
-            'stop_loss_multiplier': 2.5,
-            'take_profit_ratio': 2.0,
-            'min_liquidity': 1000000  # $1M daily volume for momentum plays
+            'max_positions': kwargs.get('max_positions', 3),
+            'risk_per_trade': kwargs.get('risk_per_trade', 0.02),
+            'stop_loss_method': kwargs.get('stop_loss_method', 'atr'),
+            'stop_loss_multiplier': kwargs.get('stop_loss_multiplier', 2.5),
+            'take_profit_ratio': kwargs.get('take_profit_ratio', 2.0),
+            'min_liquidity': kwargs.get('min_liquidity', 1000000)
         }
         
-        # Update with provided kwargs
-        defaults.update(kwargs)
-        super().__init__(**defaults)
+        # Initialize base class
+        super().__init__(**base_params)
         
         # Momentum-specific attributes
-        self.lookback_period = defaults['lookback_period']
-        self.volume_multiplier = defaults['volume_multiplier']
-        self.rsi_threshold = defaults['rsi_threshold']
-        self.price_change_threshold = defaults['price_change_threshold']
-        self.atr_expansion_threshold = defaults['atr_expansion_threshold']
-        self.min_confidence = defaults['min_confidence']
+        self.lookback_period = kwargs.get('lookback_period', 20)
+        self.volume_multiplier = kwargs.get('volume_multiplier', 1.5)
+        self.rsi_threshold = kwargs.get('rsi_threshold', 50)
+        self.price_change_threshold = kwargs.get('price_change_threshold', 0.02)
+        self.atr_expansion_threshold = kwargs.get('atr_expansion_threshold', 1.2)
+        self.min_confidence = kwargs.get('min_confidence', 0.7)
 
 
 class MomentumBreakoutStrategy(BaseStrategy):

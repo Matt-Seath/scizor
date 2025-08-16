@@ -22,7 +22,7 @@ class Position(Base):
     opened_at = Column(DateTime, nullable=False)
     closed_at = Column(DateTime)
     status = Column(String(20), default='OPEN')  # OPEN, CLOSED, PARTIAL
-    metadata = Column(JSONB)
+    position_metadata = Column(JSONB)
     created_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
@@ -52,7 +52,7 @@ class Order(Base):
     broker_order_id = Column(String(50))
     submitted_at = Column(DateTime, default=func.current_timestamp())
     filled_at = Column(DateTime)
-    metadata = Column(JSONB)
+    order_metadata = Column(JSONB)
     
     __table_args__ = (
         Index('idx_symbol_status', 'symbol', 'status'),
@@ -88,7 +88,7 @@ class PerformanceMetric(Base):
     id = Column(Integer, primary_key=True, index=True)
     metric_name = Column(String(50), nullable=False)
     metric_value = Column(DECIMAL(12, 4), nullable=False)
-    metadata = Column(JSONB)
+    metric_metadata = Column(JSONB)
     timestamp = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (

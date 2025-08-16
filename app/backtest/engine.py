@@ -211,10 +211,15 @@ class BacktestEngine:
         symbol = signal.symbol
         signal_price = signal.price
         
+        # Check if we have price data for this symbol
+        if symbol not in self.price_data:
+            logger.warning("No price data available for symbol", symbol=symbol)
+            return False
+        
         # Calculate position size
         stop_loss = None
-        if hasattr(signal, 'metadata') and signal.metadata:
-            stop_loss = signal.metadata.get('stop_loss')
+        if hasattr(signal, 'signal_metadata') and signal.signal_metadata:
+            stop_loss = signal.signal_metadata.get('stop_loss')
         
         quantity = self.calculate_position_size(symbol, signal_price, stop_loss)
         

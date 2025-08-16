@@ -15,41 +15,31 @@ class MeanReversionParameters(StrategyParameters):
     """Parameters specific to mean reversion strategy"""
     
     def __init__(self, **kwargs):
-        # Default mean reversion parameters
-        defaults = {
+        # Base strategy parameters
+        base_params = {
             'name': 'mean_reversion',
-            'rsi_oversold': 30,
-            'rsi_exit': 70,
-            'bollinger_period': 20,
-            'bollinger_std': 2.0,
-            'stoch_oversold': 20,
-            'stoch_exit': 80,
-            'volume_multiplier': 1.2,
-            'trend_filter_period': 50,  # Must be above 50-day SMA
-            'min_confidence': 0.6,
-            'max_positions': 4,  # More positions for mean reversion
-            'risk_per_trade': 0.015,  # Slightly lower risk
-            'stop_loss_method': 'percent',
-            'stop_loss_multiplier': 5.0,  # 5% stop loss
-            'take_profit_ratio': 1.5,  # 1.5:1 risk-reward (more conservative)
-            'min_liquidity': 750000,  # $750k daily volume
-            'max_holding_days': 10  # Shorter holding period
+            'max_positions': kwargs.get('max_positions', 4),
+            'risk_per_trade': kwargs.get('risk_per_trade', 0.015),
+            'stop_loss_method': kwargs.get('stop_loss_method', 'percent'),
+            'stop_loss_multiplier': kwargs.get('stop_loss_multiplier', 5.0),
+            'take_profit_ratio': kwargs.get('take_profit_ratio', 1.5),
+            'min_liquidity': kwargs.get('min_liquidity', 750000),
+            'max_holding_days': kwargs.get('max_holding_days', 10)
         }
         
-        # Update with provided kwargs
-        defaults.update(kwargs)
-        super().__init__(**defaults)
+        # Initialize base class
+        super().__init__(**base_params)
         
         # Mean reversion specific attributes
-        self.rsi_oversold = defaults['rsi_oversold']
-        self.rsi_exit = defaults['rsi_exit']
-        self.bollinger_period = defaults['bollinger_period']
-        self.bollinger_std = defaults['bollinger_std']
-        self.stoch_oversold = defaults['stoch_oversold']
-        self.stoch_exit = defaults['stoch_exit']
-        self.volume_multiplier = defaults['volume_multiplier']
-        self.trend_filter_period = defaults['trend_filter_period']
-        self.min_confidence = defaults['min_confidence']
+        self.rsi_oversold = kwargs.get('rsi_oversold', 30)
+        self.rsi_exit = kwargs.get('rsi_exit', 70)
+        self.bollinger_period = kwargs.get('bollinger_period', 20)
+        self.bollinger_std = kwargs.get('bollinger_std', 2.0)
+        self.stoch_oversold = kwargs.get('stoch_oversold', 20)
+        self.stoch_exit = kwargs.get('stoch_exit', 80)
+        self.volume_multiplier = kwargs.get('volume_multiplier', 1.2)
+        self.trend_filter_period = kwargs.get('trend_filter_period', 50)
+        self.min_confidence = kwargs.get('min_confidence', 0.6)
 
 
 class MeanReversionStrategy(BaseStrategy):

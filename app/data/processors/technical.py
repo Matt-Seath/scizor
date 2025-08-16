@@ -28,8 +28,19 @@ class TechnicalIndicators:
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
         
-        rs = gain / loss
+        # Calculate RS, handling division by zero
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
+        
+        # Handle special cases where loss = 0
+        # When only gaining (no losses), RSI should be 100
+        only_gains_mask = (loss == 0) & (gain > 0)
+        rsi.loc[only_gains_mask] = 100
+        
+        # When no movement (constant prices), RSI should be 50
+        no_movement_mask = (loss == 0) & (gain == 0)
+        rsi.loc[no_movement_mask] = 50
         
         return rsi
     
@@ -410,17 +421,32 @@ class ASXTechnicalAnalyzer:
             Take profit price
         """
         try:
-            risk_amount = entry_price - stop_loss
+            # Calculate risk amount (absolute value for both long and short positions)
+            risk_amount = abs(entry_price - stop_loss)
             reward_amount = risk_amount * risk_reward_ratio
-            take_profit = entry_price + reward_amount
             
-            # Check for resistance levels
-            lookback_period = 50
-            resistance_level = df['high'].tail(lookback_period).max()
-            
-            # Don't set take profit beyond strong resistance
-            if take_profit > resistance_level:
-                take_profit = resistance_level * 0.99  # Just below resistance
+            # For long positions (stop_loss < entry_price)
+            if stop_loss < entry_price:
+                take_profit = entry_price + reward_amount
+                
+                # Check for resistance levels
+                lookback_period = 50
+                resistance_level = df['high'].tail(lookback_period).max()
+                
+                # Don't set take profit beyond strong resistance
+                if take_profit > resistance_level:
+                    take_profit = resistance_level * 0.99  # Just below resistance
+            else:
+                # For short positions (stop_loss > entry_price)
+                take_profit = entry_price - reward_amount
+                
+                # Check for support levels
+                lookback_period = 50
+                support_level = df['low'].tail(lookback_period).min()
+                
+                # Don't set take profit below strong support
+                if take_profit < support_level:
+                    take_profit = support_level * 1.01  # Just above support
             
             return take_profit
             

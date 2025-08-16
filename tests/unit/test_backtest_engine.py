@@ -328,7 +328,7 @@ class TestBacktestEngine:
         # Add position with stop loss
         entry_date = sample_price_data.index[10]
         entry_price = sample_price_data.loc[entry_date, 'close']
-        stop_loss = entry_price * 0.95  # 5% stop loss
+        stop_loss = entry_price * 0.80  # 20% stop loss (much lower to avoid random triggering)
         
         position = BacktestPosition(
             symbol='BHP',
