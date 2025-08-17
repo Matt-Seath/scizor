@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     # Database Configuration
     database_url: str = Field(..., env="DATABASE_URL")
     async_database_url: str = Field(..., env="ASYNC_DATABASE_URL")
+    postgres_host: str = Field(..., env="POSTGRES_HOST")
+    postgres_port: int = Field(..., env="POSTGRES_PORT")
+    postgres_db: str = Field(..., env="POSTGRES_DB")
+    postgres_user: str = Field(..., env="POSTGRES_USER")
+    postgres_password: str = Field(..., env="POSTGRES_PASSWORD")
     
     # Redis Configuration
     redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
@@ -14,10 +19,15 @@ class Settings(BaseSettings):
     celery_result_backend: str = Field(default="redis://localhost:6379/0", env="CELERY_RESULT_BACKEND")
     
     # IBKR TWS API Configuration
-    ibkr_host: str = Field(default="127.0.0.1", env="IBKR_HOST")
-    ibkr_port: int = Field(default=7497, env="IBKR_PORT")
-    ibkr_client_id: int = Field(default=1, env="IBKR_CLIENT_ID")
-    ibkr_paper_port: int = Field(default=7496, env="IBKR_PAPER_PORT")
+    ibkr_host: str = Field(..., env="IBKR_HOST")
+    ibkr_port: int = Field(..., env="IBKR_PORT")
+    ibkr_client_id: int = Field(..., env="IBKR_CLIENT_ID")
+    ibkr_paper_port: int = Field(default=4002, env="IBKR_PAPER_PORT")
+    ibkr_live_port: int = Field(default=4001, env="IBKR_LIVE_PORT")
+    ibkr_paper_trading: bool = Field(default=True, env="IBKR_PAPER_TRADING")
+    ibkr_debug_mode: bool = Field(default=False, env="IBKR_DEBUG_MODE")
+    ibkr_connection_timeout: int = Field(default=30, env="IBKR_CONNECTION_TIMEOUT")
+    ibkr_request_timeout: int = Field(default=10, env="IBKR_REQUEST_TIMEOUT")
     
     # Trading Configuration
     max_positions: int = Field(default=5, env="MAX_POSITIONS")

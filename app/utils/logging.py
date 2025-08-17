@@ -2,7 +2,6 @@ import logging
 import sys
 from pathlib import Path
 import structlog
-from pythonjsonlogger import jsonlogger
 
 from app.config.settings import settings
 
@@ -19,7 +18,6 @@ def setup_logging():
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
-            structlog.processors.add_logger_name,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.dev.ConsoleRenderer() if settings.debug else structlog.processors.JSONRenderer(),
         ],

@@ -19,8 +19,8 @@ class DailyPrice(Base):
     created_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_symbol_date', 'symbol', 'date', unique=True),
-        Index('idx_date', 'date'),
+        Index('idx_daily_prices_symbol_date', 'symbol', 'date', unique=True),
+        Index('idx_daily_prices_date', 'date'),
     )
 
 
@@ -40,8 +40,8 @@ class IntradayPrice(Base):
     created_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_symbol_datetime_timeframe', 'symbol', 'datetime', 'timeframe', unique=True),
-        Index('idx_datetime', 'datetime'),
+        Index('idx_intraday_symbol_datetime_timeframe', 'symbol', 'datetime', 'timeframe', unique=True),
+        Index('idx_intraday_datetime', 'datetime'),
     )
 
 
@@ -61,9 +61,9 @@ class ApiRequest(Base):
     client_id = Column(Integer)
     
     __table_args__ = (
-        Index('idx_request_type_timestamp', 'request_type', 'timestamp'),
-        Index('idx_status_timestamp', 'status', 'timestamp'),
-        Index('idx_symbol_timestamp', 'symbol', 'timestamp'),
+        Index('idx_api_requests_type_timestamp', 'request_type', 'timestamp'),
+        Index('idx_api_requests_status_timestamp', 'status', 'timestamp'),
+        Index('idx_api_requests_symbol_timestamp', 'symbol', 'timestamp'),
     )
 
 
@@ -82,8 +82,8 @@ class ConnectionState(Base):
     last_data_received_at = Column(DateTime)
     
     __table_args__ = (
-        Index('idx_status', 'status'),
-        Index('idx_last_heartbeat', 'last_heartbeat'),
+        Index('idx_connection_status', 'status'),
+        Index('idx_connection_last_heartbeat', 'last_heartbeat'),
     )
 
 
@@ -101,8 +101,8 @@ class RateLimit(Base):
     reset_at = Column(DateTime)
     
     __table_args__ = (
-        Index('idx_client_type_window', 'client_id', 'request_type', 'window_start'),
-        Index('idx_window_end', 'window_end'),
+        Index('idx_rate_limits_client_type_window', 'client_id', 'request_type', 'window_start'),
+        Index('idx_rate_limits_window_end', 'window_end'),
     )
 
 
@@ -127,8 +127,8 @@ class ContractDetail(Base):
     updated_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_symbol_exchange', 'symbol', 'exchange'),
-        Index('idx_updated_at', 'updated_at'),
+        Index('idx_contracts_symbol_exchange', 'symbol', 'exchange'),
+        Index('idx_contracts_updated_at', 'updated_at'),
     )
 
 
@@ -149,6 +149,6 @@ class MarketDataSubscription(Base):
     error_count = Column(Integer, default=0)
     
     __table_args__ = (
-        Index('idx_symbol_status', 'symbol', 'status'),
-        Index('idx_subscribed_at', 'subscribed_at'),
+        Index('idx_subscriptions_symbol_status', 'symbol', 'status'),
+        Index('idx_subscriptions_subscribed_at', 'subscribed_at'),
     )

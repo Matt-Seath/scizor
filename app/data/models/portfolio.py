@@ -26,9 +26,9 @@ class Position(Base):
     created_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_symbol_status', 'symbol', 'status'),
-        Index('idx_strategy_status', 'strategy', 'status'),
-        Index('idx_opened_at', 'opened_at'),
+        Index('idx_positions_symbol_status', 'symbol', 'status'),
+        Index('idx_positions_strategy_status', 'strategy', 'status'),
+        Index('idx_positions_opened_at', 'opened_at'),
     )
 
 
@@ -55,9 +55,9 @@ class Order(Base):
     order_metadata = Column(JSONB)
     
     __table_args__ = (
-        Index('idx_symbol_status', 'symbol', 'status'),
-        Index('idx_broker_order_id', 'broker_order_id'),
-        Index('idx_submitted_at', 'submitted_at'),
+        Index('idx_orders_symbol_status', 'symbol', 'status'),
+        Index('idx_orders_broker_order_id', 'broker_order_id'),
+        Index('idx_orders_submitted_at', 'submitted_at'),
     )
 
 
@@ -77,7 +77,7 @@ class RiskMetric(Base):
     created_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_date', 'date'),
+        Index('idx_risk_metrics_date', 'date'),
     )
 
 
@@ -92,5 +92,5 @@ class PerformanceMetric(Base):
     timestamp = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_metric_timestamp', 'metric_name', 'timestamp'),
+        Index('idx_performance_metric_timestamp', 'metric_name', 'timestamp'),
     )

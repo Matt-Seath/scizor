@@ -6,6 +6,7 @@ Creates all tables and performs initial database setup
 
 import sys
 import os
+import argparse
 from pathlib import Path
 
 # Add app directory to path
@@ -25,7 +26,7 @@ from app.data.models.portfolio import Position, Order, RiskMetric, PerformanceMe
 
 logger = structlog.get_logger(__name__)
 
-def create_database():
+def create_database(nuke=False):
     """Create the database and all tables"""
     try:
         # Load environment variables
@@ -36,13 +37,36 @@ def create_database():
         postgres_password = os.getenv('POSTGRES_PASSWORD', 'password')
         postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
         postgres_port = os.getenv('POSTGRES_PORT', '5432')
-        postgres_db = os.getenv('POSTGRES_DB', 'asx_trading')
+        postgres_db = os.getenv('POSTGRES_DB', 'scizor_db')
         
         database_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
         logger.info("Setting up database", url=database_url.replace(postgres_password, "***"))
         
         # Create engine
         engine = create_engine(database_url)
+        
+        if nuke:
+            # Drop all tables first (clean slate)
+            logger.info("🔥 NUKING: Dropping all existing tables and indexes...")
+            with engine.connect() as conn:
+                # Drop all indexes first
+                result = conn.execute(text("""
+                    SELECT indexname FROM pg_indexes 
+                    WHERE schemaname = 'public' 
+                    AND indexname NOT LIKE 'pg_%'
+                """))
+                indexes = [row[0] for row in result.fetchall()]
+                for index in indexes:
+                    try:
+                        conn.execute(text(f"DROP INDEX IF EXISTS {index}"))
+                        logger.info(f"Dropped index: {index}")
+                    except Exception as e:
+                        logger.warning(f"Could not drop index {index}: {e}")
+                
+                conn.commit()
+            
+            # Now drop all tables
+            Base.metadata.drop_all(bind=engine)
         
         # Create all tables
         logger.info("Creating database tables...")
@@ -87,7 +111,7 @@ def seed_test_data():
         postgres_password = os.getenv('POSTGRES_PASSWORD', 'password')
         postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
         postgres_port = os.getenv('POSTGRES_PORT', '5432')
-        postgres_db = os.getenv('POSTGRES_DB', 'asx_trading')
+        postgres_db = os.getenv('POSTGRES_DB', 'scizor_db')
         
         database_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
         engine = create_engine(database_url)
@@ -143,20 +167,34 @@ def seed_test_data():
 
 def main():
     """Main setup function"""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='ASX200 Trading System Database Setup')
+    parser.add_argument('--nuke', action='store_true', 
+                       help='Drop all existing tables before creating new ones')
+    parser.add_argument('--no-seed', action='store_true',
+                       help='Skip seeding test data')
+    args = parser.parse_args()
+    
+    if args.nuke:
+        print("🔥 NUKE MODE: Will drop all existing tables first!")
+    
     print("🚀 Starting ASX200 Trading System Database Setup")
     print("=" * 50)
     
     # Step 1: Create database and tables
     print("1. Creating database schema...")
-    if not create_database():
+    if not create_database(nuke=args.nuke):
         print("❌ Database creation failed")
         sys.exit(1)
     
-    # Step 2: Seed test data
-    print("\n2. Seeding test data...")
-    if not seed_test_data():
-        print("❌ Test data seeding failed")
-        sys.exit(1)
+    # Step 2: Seed test data (unless --no-seed is specified)
+    if not args.no_seed:
+        print("\n2. Seeding test data...")
+        if not seed_test_data():
+            print("❌ Test data seeding failed")
+            sys.exit(1)
+    else:
+        print("\n2. Skipping test data seeding (--no-seed specified)")
     
     print("\n✅ Database setup completed successfully!")
     print("\nNext steps:")

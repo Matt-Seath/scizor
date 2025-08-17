@@ -21,7 +21,7 @@ class Signal(Base):
     created_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
-        Index('idx_symbol_generated', 'symbol', 'generated_at'),
-        Index('idx_status', 'status'),
-        Index('idx_strategy', 'strategy'),
+        Index('idx_signals_symbol_generated', 'symbol', 'generated_at'),
+        Index('idx_signals_status', 'status'),
+        Index('idx_signals_strategy', 'strategy'),
     )

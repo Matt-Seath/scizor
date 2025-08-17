@@ -5,7 +5,7 @@ import structlog
 
 from app.config.settings import settings
 from app.config.database import init_db, close_db
-from app.api.routes import health, dashboard
+from app.api.routes import health, dashboard, data_collection
 from app.utils.logging import setup_logging
 
 
@@ -57,6 +57,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(data_collection.router, prefix="/api/data", tags=["data-collection"])
 
 
 @app.get("/")

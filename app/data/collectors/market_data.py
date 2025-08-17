@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as datetime_time
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass
 import pytz
@@ -50,10 +50,10 @@ class ASXMarketHours:
     
     def __init__(self):
         self.timezone = pytz.timezone('Australia/Sydney')
-        self.market_open = datetime.time(10, 0)   # 10:00 AM
-        self.market_close = datetime.time(16, 0)  # 4:00 PM
-        self.pre_market_start = datetime.time(7, 0)   # 7:00 AM
-        self.after_hours_end = datetime.time(19, 0)   # 7:00 PM
+        self.market_open = datetime_time(10, 0)   # 10:00 AM
+        self.market_close = datetime_time(16, 0)  # 4:00 PM
+        self.pre_market_start = datetime_time(7, 0)   # 7:00 AM
+        self.after_hours_end = datetime_time(19, 0)   # 7:00 PM
     
     def is_market_open(self, dt: datetime = None) -> bool:
         """Check if ASX market is currently open"""
