@@ -13,8 +13,11 @@ from app.data.collectors.asx_contracts import (
     get_asx200_symbols, 
     get_liquid_stocks
 )
+from app.data.models.market import DailyPrice
 from app.config.database import AsyncSessionLocal
 from app.config.settings import settings
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 
 logger = structlog.get_logger(__name__)
 
@@ -231,23 +234,33 @@ class MarketDataCollector:
                    symbols=len(request_ids), total=len(symbols))
         return request_ids
     
-    def _historical_data_callback(self, symbol: str, db_session: AsyncSession) -> Callable:
-        """Create callback for historical data"""
+    def _historical_data_callback(self, symbol: str, data_buffer: List[HistoricalBar]) -> Callable:
+        """Create callback for historical data that stores in buffer for async processing"""
         def callback(bar):
             try:
+                # Parse date - handle both "20240101" and "20240101  23:59:59" formats
+                date_str = bar.date.strip()
+                if len(date_str) == 8:  # Format: "20240101"
+                    bar_date = datetime.strptime(date_str, "%Y%m%d")
+                else:  # Format: "20240101  23:59:59"
+                    bar_date = datetime.strptime(date_str.split()[0], "%Y%m%d")
+                
                 historical_bar = HistoricalBar(
                     symbol=symbol,
-                    date=datetime.strptime(bar.date, "%Y%m%d"),
+                    date=bar_date,
                     open=float(bar.open),
                     high=float(bar.high),
                     low=float(bar.low),
                     close=float(bar.close),
-                    volume=int(bar.volume)
+                    volume=int(bar.volume) if bar.volume != -1 else 0,
+                    adjusted_close=float(bar.close)  # Use close as adjusted_close for now
                 )
                 
-                # TODO: Store in database
+                # Store in buffer for async processing
+                data_buffer.append(historical_bar)
+                
                 logger.debug("Historical bar received", 
-                           symbol=symbol, date=bar.date, close=bar.close)
+                           symbol=symbol, date=bar_date.strftime('%Y-%m-%d'), close=bar.close)
                 
                 self.collection_stats["successful_responses"] += 1
                 
@@ -257,6 +270,71 @@ class MarketDataCollector:
                 self.collection_stats["errors"] += 1
         
         return callback
+    
+    async def _store_historical_bars(self, bars: List[HistoricalBar], db_session: AsyncSession) -> int:
+        """Store historical bars in database with upsert logic"""
+        stored_count = 0
+        
+        for bar in bars:
+            try:
+                # Create DailyPrice object
+                daily_price = DailyPrice(
+                    symbol=bar.symbol,
+                    date=bar.date,
+                    open=bar.open,
+                    high=bar.high,
+                    low=bar.low,
+                    close=bar.close,
+                    volume=bar.volume,
+                    adj_close=bar.adjusted_close,
+                    created_at=datetime.now()
+                )
+                
+                # Use PostgreSQL UPSERT to handle duplicates
+                stmt = insert(DailyPrice).values(
+                    symbol=bar.symbol,
+                    date=bar.date,
+                    open=bar.open,
+                    high=bar.high,
+                    low=bar.low,
+                    close=bar.close,
+                    volume=bar.volume,
+                    adj_close=bar.adjusted_close,
+                    created_at=datetime.now()
+                )
+                
+                # ON CONFLICT DO NOTHING - skip duplicates
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=['symbol', 'date']
+                )
+                
+                await db_session.execute(stmt)
+                stored_count += 1
+                
+                logger.debug("Stored historical data", 
+                           symbol=bar.symbol, 
+                           date=bar.date.strftime('%Y-%m-%d'),
+                           close=bar.close)
+                
+            except Exception as e:
+                logger.error("Error storing historical bar", 
+                           symbol=bar.symbol, 
+                           date=bar.date.strftime('%Y-%m-%d') if bar.date else 'unknown',
+                           error=str(e))
+                self.collection_stats["errors"] += 1
+                continue
+        
+        try:
+            await db_session.commit()
+            logger.info("Successfully stored historical data", 
+                       bars_stored=stored_count, 
+                       total_bars=len(bars))
+        except Exception as e:
+            await db_session.rollback()
+            logger.error("Error committing historical data", error=str(e))
+            raise
+        
+        return stored_count
     
     async def collect_daily_data(self, symbols: List[str] = None) -> bool:
         """
@@ -286,37 +364,330 @@ class MarketDataCollector:
         logger.info("Starting daily data collection", symbols=len(symbols))
         
         successful_collections = 0
+        symbol_data_buffers = {}  # Store data buffers for each symbol
+        pending_requests = {}     # Track pending request IDs
+        
+        # Phase 1: Submit all historical data requests
+        for i, symbol in enumerate(symbols):
+            try:
+                contract = create_asx_stock_contract(symbol)
+                
+                # Create data buffer for this symbol
+                data_buffer = []
+                symbol_data_buffers[symbol] = data_buffer
+                
+                callback = self._historical_data_callback(symbol, data_buffer)
+                
+                req_id = self.ibkr_client.request_historical_data(
+                    contract, "1 D", "1 day", callback
+                )
+                
+                if req_id:
+                    pending_requests[req_id] = symbol
+                    successful_collections += 1
+                    self.collection_stats["requests_made"] += 1
+                    
+                    logger.debug("Submitted historical data request", 
+                               symbol=symbol, req_id=req_id)
+                
+                # Rate limiting: batch processing with delays
+                if (i + 1) % 10 == 0:  # Every 10 requests
+                    logger.info("Processing batch", completed=i+1, total=len(symbols))
+                    await asyncio.sleep(2)  # 2 second pause between batches
+                else:
+                    await asyncio.sleep(0.1)  # 100ms between individual requests
+                    
+            except Exception as e:
+                logger.error("Error submitting request for symbol", 
+                           symbol=symbol, error=str(e))
+                self.collection_stats["errors"] += 1
+        
+        # Phase 2: Wait for all data to be received (with timeout)
+        logger.info("Waiting for historical data responses", pending_requests=len(pending_requests))
+        
+        wait_timeout = 60  # 60 seconds total timeout
+        wait_start = time.time()
+        
+        while pending_requests and (time.time() - wait_start) < wait_timeout:
+            # Check which requests have completed by looking at client's pending requests
+            completed_requests = []
+            for req_id, symbol in pending_requests.items():
+                if req_id not in self.ibkr_client.pending_requests:
+                    completed_requests.append(req_id)
+                    logger.debug("Historical data request completed", 
+                               symbol=symbol, req_id=req_id)
+            
+            # Remove completed requests
+            for req_id in completed_requests:
+                del pending_requests[req_id]
+            
+            if pending_requests:
+                await asyncio.sleep(0.5)  # Check every 500ms
+        
+        if pending_requests:
+            logger.warning("Some historical data requests timed out", 
+                         remaining=len(pending_requests))
+        
+        # Phase 3: Store all collected data in database
+        total_bars_stored = 0
         
         async with AsyncSessionLocal() as db_session:
-            for i, symbol in enumerate(symbols):
-                try:
-                    contract = create_asx_stock_contract(symbol)
-                    callback = self._historical_data_callback(symbol, db_session)
-                    
-                    req_id = self.ibkr_client.request_historical_data(
-                        contract, "1 D", "1 day", callback
-                    )
-                    
-                    if req_id:
-                        successful_collections += 1
-                        self.collection_stats["requests_made"] += 1
-                    
-                    # Rate limiting: batch processing with delays
-                    if (i + 1) % 10 == 0:  # Every 10 requests
-                        logger.info("Processing batch", completed=i+1, total=len(symbols))
-                        await asyncio.sleep(2)  # 2 second pause between batches
-                    else:
-                        await asyncio.sleep(0.1)  # 100ms between individual requests
-                        
-                except Exception as e:
-                    logger.error("Error collecting data for symbol", 
-                               symbol=symbol, error=str(e))
-                    self.collection_stats["errors"] += 1
+            for symbol, data_buffer in symbol_data_buffers.items():
+                if data_buffer:
+                    try:
+                        stored_count = await self._store_historical_bars(data_buffer, db_session)
+                        total_bars_stored += stored_count
+                        logger.info("Stored historical data", 
+                                  symbol=symbol, bars=stored_count)
+                    except Exception as e:
+                        logger.error("Error storing data for symbol", 
+                                   symbol=symbol, error=str(e))
+                        self.collection_stats["errors"] += 1
+                else:
+                    logger.warning("No data received for symbol", symbol=symbol)
         
         logger.info("Daily data collection completed", 
-                   successful=successful_collections, total=len(symbols))
+                   successful_requests=successful_collections, 
+                   total_symbols=len(symbols),
+                   total_bars_stored=total_bars_stored)
         
-        return successful_collections > 0
+        return successful_collections > 0 and total_bars_stored > 0
+    
+    async def get_existing_data_dates(self, symbol: str) -> set:
+        """Get set of dates that already have data for this symbol"""
+        async with AsyncSessionLocal() as db_session:
+            from sqlalchemy import select
+            
+            result = await db_session.execute(
+                select(DailyPrice.date).where(DailyPrice.symbol == symbol)
+            )
+            
+            existing_dates = set()
+            for row in result:
+                date_str = row[0].strftime('%Y-%m-%d')
+                existing_dates.add(date_str)
+            
+            return existing_dates
+    
+    def _generate_date_ranges(self, start_date: datetime, end_date: datetime, max_days_per_request: int = 365) -> List[tuple]:
+        """Generate date ranges for IBKR requests, respecting maximum request size"""
+        ranges = []
+        current_start = start_date
+        
+        while current_start < end_date:
+            days_remaining = (end_date - current_start).days
+            chunk_days = min(max_days_per_request, days_remaining)
+            current_end = current_start + timedelta(days=chunk_days)
+            
+            if current_end > end_date:
+                current_end = end_date
+            
+            ranges.append((current_start, current_end))
+            current_start = current_end + timedelta(days=1)
+        
+        return ranges
+    
+    def _format_date_for_ibkr(self, date: datetime) -> str:
+        """Format date for IBKR API with timezone"""
+        # Use UTC to avoid timezone issues with IBKR API
+        return date.strftime("%Y%m%d 23:59:59 UTC")
+    
+    def _is_trading_day(self, date: datetime) -> bool:
+        """Check if a date is likely a trading day (exclude weekends)"""
+        return date.weekday() < 5  # Monday=0 to Friday=4
+    
+    async def backfill_historical_data(self, symbol: str, start_date: datetime, 
+                                     end_date: datetime, skip_existing: bool = True) -> dict:
+        """
+        Backfill historical data for a symbol over a date range
+        
+        Args:
+            symbol: The symbol to collect data for
+            start_date: Start date for data collection
+            end_date: End date for data collection
+            skip_existing: If True, skip dates that already have data
+            
+        Returns:
+            Dict with collection statistics
+        """
+        logger.info("Starting historical data backfill", 
+                   symbol=symbol, 
+                   start_date=start_date.strftime('%Y-%m-%d'),
+                   end_date=end_date.strftime('%Y-%m-%d'))
+        
+        # Initialize statistics
+        backfill_stats = {
+            "symbol": symbol,
+            "start_date": start_date.strftime('%Y-%m-%d'),
+            "end_date": end_date.strftime('%Y-%m-%d'),
+            "total_days": (end_date - start_date).days + 1,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "bars_collected": 0,
+            "bars_stored": 0,
+            "existing_dates_skipped": 0,
+            "start_time": datetime.now(),
+            "end_time": None
+        }
+        
+        try:
+            # Get existing data dates if we should skip them
+            existing_dates = set()
+            if skip_existing:
+                existing_dates = await self.get_existing_data_dates(symbol)
+                logger.info("Found existing data points to skip", 
+                           symbol=symbol, existing_count=len(existing_dates))
+            
+            # Generate date ranges for chunked requests
+            date_ranges = self._generate_date_ranges(start_date, end_date)
+            logger.info("Generated date ranges for backfill", 
+                       symbol=symbol, chunks=len(date_ranges))
+            
+            all_data_buffers = []
+            
+            # Process each date range chunk
+            for i, (range_start, range_end) in enumerate(date_ranges):
+                logger.info("Processing backfill chunk", 
+                           symbol=symbol, 
+                           chunk=f"{i+1}/{len(date_ranges)}",
+                           range_start=range_start.strftime('%Y-%m-%d'),
+                           range_end=range_end.strftime('%Y-%m-%d'))
+                
+                # Check if we need data for this range
+                if skip_existing:
+                    days_needed = self._count_trading_days_needed(range_start, range_end, existing_dates)
+                    if days_needed == 0:
+                        logger.info("Skipping chunk - all data already exists", 
+                                   symbol=symbol, chunk=i+1)
+                        continue
+                    
+                    logger.info("Need data for trading days", 
+                               symbol=symbol, days_needed=days_needed)
+                
+                # Request historical data for this chunk
+                chunk_buffer = await self._request_historical_data_chunk(
+                    symbol, range_start, range_end
+                )
+                
+                if chunk_buffer:
+                    all_data_buffers.extend(chunk_buffer)
+                    backfill_stats["successful_requests"] += 1
+                    backfill_stats["bars_collected"] += len(chunk_buffer)
+                    logger.info("Collected chunk data", 
+                               symbol=symbol, bars=len(chunk_buffer))
+                else:
+                    backfill_stats["failed_requests"] += 1
+                    logger.warning("Failed to collect chunk data", 
+                                  symbol=symbol, chunk=i+1)
+                
+                # Rate limiting between chunks
+                if i < len(date_ranges) - 1:
+                    await asyncio.sleep(2)  # 2 second delay between chunks
+            
+            # Store all collected data
+            if all_data_buffers:
+                logger.info("Storing backfilled data", 
+                           symbol=symbol, total_bars=len(all_data_buffers))
+                
+                async with AsyncSessionLocal() as db_session:
+                    stored_count = await self._store_historical_bars(all_data_buffers, db_session)
+                    backfill_stats["bars_stored"] = stored_count
+                    
+                    logger.info("Successfully stored backfilled data", 
+                               symbol=symbol, bars_stored=stored_count)
+            
+            backfill_stats["end_time"] = datetime.now()
+            duration = (backfill_stats["end_time"] - backfill_stats["start_time"]).total_seconds()
+            backfill_stats["duration_seconds"] = duration
+            
+            logger.info("Historical data backfill completed", 
+                       symbol=symbol, 
+                       bars_stored=backfill_stats["bars_stored"],
+                       duration_seconds=duration)
+            
+            return backfill_stats
+            
+        except Exception as e:
+            logger.error("Error in historical data backfill", 
+                        symbol=symbol, error=str(e))
+            backfill_stats["error"] = str(e)
+            backfill_stats["end_time"] = datetime.now()
+            return backfill_stats
+    
+    def _count_trading_days_needed(self, start_date: datetime, end_date: datetime, existing_dates: set) -> int:
+        """Count how many trading days we need to collect in a date range"""
+        count = 0
+        current_date = start_date
+        
+        while current_date <= end_date:
+            if self._is_trading_day(current_date):
+                date_str = current_date.strftime('%Y-%m-%d')
+                if date_str not in existing_dates:
+                    count += 1
+            current_date += timedelta(days=1)
+        
+        return count
+    
+    async def _request_historical_data_chunk(self, symbol: str, start_date: datetime, 
+                                           end_date: datetime) -> List[HistoricalBar]:
+        """Request historical data for a specific date range chunk"""
+        try:
+            # Create contract for the symbol
+            contract = create_asx_stock_contract(symbol)
+            
+            # Calculate duration for IBKR request
+            duration_days = (end_date - start_date).days + 1
+            
+            # Format duration for IBKR API
+            if duration_days > 365:
+                duration_years = round(duration_days / 365.25, 1)
+                duration_str = f"{int(duration_years) if duration_years.is_integer() else duration_years} Y"
+            else:
+                duration_str = f"{duration_days} D"
+            
+            # Format end date with timezone
+            end_date_str = self._format_date_for_ibkr(end_date)
+            
+            logger.debug("Requesting historical data chunk", 
+                        symbol=symbol, 
+                        duration=duration_str, 
+                        end_date=end_date_str)
+            
+            # Create data buffer for this request
+            data_buffer = []
+            callback = self._historical_data_callback(symbol, data_buffer)
+            
+            # Submit request
+            req_id = self.ibkr_client.request_historical_data(
+                contract, duration_str, "1 day", callback
+            )
+            
+            if not req_id:
+                logger.error("Failed to submit historical data request", symbol=symbol)
+                return []
+            
+            # Wait for data to be received (with timeout)
+            wait_timeout = 30  # 30 seconds timeout per chunk
+            wait_start = time.time()
+            
+            while (req_id in self.ibkr_client.pending_requests and 
+                   (time.time() - wait_start) < wait_timeout):
+                await asyncio.sleep(0.5)
+            
+            if req_id in self.ibkr_client.pending_requests:
+                logger.warning("Historical data request timed out", 
+                              symbol=symbol, req_id=req_id)
+                return []
+            
+            logger.debug("Historical data chunk received", 
+                        symbol=symbol, bars=len(data_buffer))
+            
+            return data_buffer
+            
+        except Exception as e:
+            logger.error("Error requesting historical data chunk", 
+                        symbol=symbol, error=str(e))
+            return []
     
     def get_latest_data(self, symbol: str) -> Optional[MarketDataPoint]:
         """Get latest market data point for a symbol"""

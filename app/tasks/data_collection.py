@@ -302,3 +302,535 @@ async def _async_test_connection() -> dict:
             'connected': False,
             'error': str(e)
         }
+
+
+@celery_app.task(bind=True, name='app.tasks.data_collection.backfill_historical_data')
+def backfill_historical_data(self, symbol: str, start_date: str, end_date: str, skip_existing: bool = True):
+    """
+    Celery task to backfill historical data for a specific symbol
+    
+    Args:
+        symbol: Stock symbol to backfill
+        start_date: Start date in 'YYYY-MM-DD' format
+        end_date: End date in 'YYYY-MM-DD' format
+        skip_existing: Whether to skip dates that already have data
+    """
+    task_id = self.request.id
+    logger.info("Starting historical data backfill", 
+               symbol=symbol, start_date=start_date, end_date=end_date, task_id=task_id)
+    
+    try:
+        # Parse dates
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Run the async backfill
+        result = asyncio.run(_async_backfill_symbol(symbol, start_dt, end_dt, skip_existing, task_id))
+        
+        if result['success']:
+            logger.info("Historical data backfill completed successfully", 
+                       symbol=symbol, bars_stored=result['bars_stored'], task_id=task_id)
+            return {
+                'status': 'success',
+                'symbol': symbol,
+                **result
+            }
+        else:
+            logger.error("Historical data backfill failed", 
+                        symbol=symbol, error=result.get('error'), task_id=task_id)
+            return {
+                'status': 'failed',
+                'symbol': symbol,
+                'error': result.get('error', 'Unknown error')
+            }
+            
+    except ValueError as e:
+        error_msg = f"Invalid date format: {str(e)}"
+        logger.error("Backfill task failed", error=error_msg, task_id=task_id)
+        return {
+            'status': 'failed',
+            'error': error_msg
+        }
+    except Exception as e:
+        logger.error("Unexpected error in backfill task", 
+                    error=str(e), task_id=task_id)
+        raise self.retry(countdown=300, max_retries=2)  # Retry in 5 minutes
+
+
+async def _async_backfill_symbol(symbol: str, start_date: datetime, end_date: datetime, 
+                                skip_existing: bool, task_id: str) -> dict:
+    """Async helper function for symbol backfill"""
+    try:
+        # Initialize market data collector
+        collector = MarketDataCollector()
+        
+        # Start the collector (connects to IBKR)
+        if not await collector.start_collection():
+            return {
+                'success': False,
+                'error': 'Failed to connect to IBKR TWS'
+            }
+        
+        logger.info("Starting backfill for symbol", symbol=symbol, 
+                   start_date=start_date.strftime('%Y-%m-%d'), 
+                   end_date=end_date.strftime('%Y-%m-%d'))
+        
+        # Update task progress
+        if hasattr(current_task, 'update_state'):
+            current_task.update_state(
+                state='PROGRESS',
+                meta={'current': 0, 'total': 100, 'status': f'Starting backfill for {symbol}'}
+            )
+        
+        # Perform backfill
+        backfill_stats = await collector.backfill_historical_data(
+            symbol, start_date, end_date, skip_existing
+        )
+        
+        # Update task progress
+        if hasattr(current_task, 'update_state'):
+            current_task.update_state(
+                state='PROGRESS', 
+                meta={'current': 100, 'total': 100, 'status': f'Completed backfill for {symbol}'}
+            )
+        
+        # Stop the collector
+        await collector.stop_collection()
+        
+        # Log backfill statistics to database
+        await _log_backfill_stats(task_id, symbol, backfill_stats)
+        
+        return {
+            'success': backfill_stats.get('bars_stored', 0) > 0 or backfill_stats.get('error') is None,
+            **backfill_stats
+        }
+        
+    except Exception as e:
+        logger.error("Error in async backfill", symbol=symbol, error=str(e))
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@celery_app.task(bind=True, name='app.tasks.data_collection.batch_backfill_historical_data')
+def batch_backfill_historical_data(self, symbols: List[str], start_date: str, end_date: str, skip_existing: bool = True):
+    """
+    Celery task to backfill historical data for multiple symbols
+    
+    Args:
+        symbols: List of stock symbols to backfill
+        start_date: Start date in 'YYYY-MM-DD' format
+        end_date: End date in 'YYYY-MM-DD' format
+        skip_existing: Whether to skip dates that already have data
+    """
+    task_id = self.request.id
+    logger.info("Starting batch historical data backfill", 
+               symbols_count=len(symbols), start_date=start_date, end_date=end_date, task_id=task_id)
+    
+    try:
+        # Parse dates
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Run the async batch backfill
+        result = asyncio.run(_async_batch_backfill(symbols, start_dt, end_dt, skip_existing, task_id))
+        
+        logger.info("Batch historical data backfill completed", 
+                   successful=result['successful_symbols'], 
+                   failed=result['failed_symbols'], 
+                   task_id=task_id)
+        
+        return {
+            'status': 'completed',
+            'symbols_requested': len(symbols),
+            **result
+        }
+        
+    except ValueError as e:
+        error_msg = f"Invalid date format: {str(e)}"
+        logger.error("Batch backfill task failed", error=error_msg, task_id=task_id)
+        return {
+            'status': 'failed',
+            'error': error_msg
+        }
+    except Exception as e:
+        logger.error("Unexpected error in batch backfill task", 
+                    error=str(e), task_id=task_id)
+        raise self.retry(countdown=600, max_retries=2)  # Retry in 10 minutes
+
+
+async def _async_batch_backfill(symbols: List[str], start_date: datetime, end_date: datetime, 
+                               skip_existing: bool, task_id: str) -> dict:
+    """Async helper function for batch backfill"""
+    successful_symbols = []
+    failed_symbols = []
+    total_bars_stored = 0
+    
+    try:
+        # Initialize market data collector once for all symbols
+        collector = MarketDataCollector()
+        
+        # Start the collector (connects to IBKR)
+        if not await collector.start_collection():
+            return {
+                'successful_symbols': 0,
+                'failed_symbols': len(symbols),
+                'total_bars_stored': 0,
+                'error': 'Failed to connect to IBKR TWS'
+            }
+        
+        # Process each symbol
+        for i, symbol in enumerate(symbols):
+            try:
+                # Update task progress
+                if hasattr(current_task, 'update_state'):
+                    current_task.update_state(
+                        state='PROGRESS',
+                        meta={
+                            'current': i + 1, 
+                            'total': len(symbols), 
+                            'status': f'Processing {symbol} ({i+1}/{len(symbols)})'
+                        }
+                    )
+                
+                logger.info("Processing symbol in batch", symbol=symbol, progress=f"{i+1}/{len(symbols)}")
+                
+                # Perform backfill for this symbol
+                backfill_stats = await collector.backfill_historical_data(
+                    symbol, start_date, end_date, skip_existing
+                )
+                
+                if backfill_stats.get('bars_stored', 0) > 0 or backfill_stats.get('error') is None:
+                    successful_symbols.append(symbol)
+                    total_bars_stored += backfill_stats.get('bars_stored', 0)
+                    logger.info("Symbol backfill successful", symbol=symbol, bars=backfill_stats.get('bars_stored', 0))
+                else:
+                    failed_symbols.append({
+                        'symbol': symbol,
+                        'error': backfill_stats.get('error', 'Unknown error')
+                    })
+                    logger.warning("Symbol backfill failed", symbol=symbol, error=backfill_stats.get('error'))
+                
+                # Rate limiting between symbols
+                if i < len(symbols) - 1:
+                    await asyncio.sleep(5)  # 5 second delay between symbols
+                    
+            except Exception as e:
+                failed_symbols.append({
+                    'symbol': symbol,
+                    'error': str(e)
+                })
+                logger.error("Error processing symbol in batch", symbol=symbol, error=str(e))
+        
+        # Stop the collector
+        await collector.stop_collection()
+        
+        return {
+            'successful_symbols': len(successful_symbols),
+            'failed_symbols': len(failed_symbols),
+            'total_bars_stored': total_bars_stored,
+            'successful_symbol_list': successful_symbols,
+            'failed_symbol_details': failed_symbols
+        }
+        
+    except Exception as e:
+        logger.error("Error in async batch backfill", error=str(e))
+        return {
+            'successful_symbols': len(successful_symbols),
+            'failed_symbols': len(symbols) - len(successful_symbols),
+            'total_bars_stored': total_bars_stored,
+            'error': str(e)
+        }
+
+
+async def _log_backfill_stats(task_id: str, symbol: str, backfill_stats: dict):
+    """Log backfill statistics to database"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            api_request = ApiRequest(
+                request_type='HISTORICAL_BACKFILL',
+                req_id=hash(task_id) % 10000,  # Convert task_id to int
+                symbol=symbol,
+                timestamp=datetime.now(),
+                status='SUCCESS' if backfill_stats.get('bars_stored', 0) > 0 else 'FAILED',
+                client_id=settings.ibkr_client_id,
+                response_time_ms=int(backfill_stats.get('duration_seconds', 0) * 1000)
+            )
+            
+            db_session.add(api_request)
+            await db_session.commit()
+            
+            logger.debug("Backfill stats logged", 
+                        symbol=symbol, bars_stored=backfill_stats.get('bars_stored', 0))
+                        
+        except Exception as e:
+            logger.error("Failed to log backfill stats", symbol=symbol, error=str(e))
+
+
+@celery_app.task(bind=True, name='app.tasks.data_collection.validate_symbol_data')
+def validate_symbol_data(self, symbol: str, days_lookback: int = 30):
+    """
+    Celery task to validate data quality for a specific symbol
+    
+    Args:
+        symbol: Stock symbol to validate
+        days_lookback: Number of days to look back for validation
+    """
+    task_id = self.request.id
+    logger.info("Starting data validation", symbol=symbol, days_lookback=days_lookback, task_id=task_id)
+    
+    try:
+        # Run the async validation
+        result = asyncio.run(_async_validate_symbol(symbol, days_lookback, task_id))
+        
+        if result['success']:
+            logger.info("Data validation completed successfully", 
+                       symbol=symbol, quality_score=result['quality_score'], 
+                       issues_found=result['issues_found'], task_id=task_id)
+            return {
+                'status': 'success',
+                'symbol': symbol,
+                **result
+            }
+        else:
+            logger.error("Data validation failed", 
+                        symbol=symbol, error=result.get('error'), task_id=task_id)
+            return {
+                'status': 'failed',
+                'symbol': symbol,
+                'error': result.get('error', 'Unknown error')
+            }
+            
+    except Exception as e:
+        logger.error("Unexpected error in validation task", 
+                    error=str(e), task_id=task_id)
+        return {
+            'status': 'failed',
+            'error': str(e)
+        }
+
+
+async def _async_validate_symbol(symbol: str, days_lookback: int, task_id: str) -> dict:
+    """Async helper function for symbol validation"""
+    try:
+        from app.data.processors.validation import ASXDataValidator
+        
+        validator = ASXDataValidator()
+        
+        # Update task progress
+        if hasattr(current_task, 'update_state'):
+            current_task.update_state(
+                state='PROGRESS',
+                meta={'current': 25, 'total': 100, 'status': f'Starting validation for {symbol}'}
+            )
+        
+        async with AsyncSessionLocal() as db_session:
+            # Perform validation
+            validation_report = await validator.validate_symbol_data(symbol, db_session, days_lookback)
+            
+            # Update task progress
+            if hasattr(current_task, 'update_state'):
+                current_task.update_state(
+                    state='PROGRESS',
+                    meta={'current': 75, 'total': 100, 'status': f'Analyzing results for {symbol}'}
+                )
+            
+            # Log validation statistics
+            await _log_validation_stats(task_id, symbol, validation_report)
+            
+            # Update task progress
+            if hasattr(current_task, 'update_state'):
+                current_task.update_state(
+                    state='PROGRESS',
+                    meta={'current': 100, 'total': 100, 'status': f'Validation completed for {symbol}'}
+                )
+            
+            return {
+                'success': True,
+                'quality_score': validation_report.quality_score,
+                'data_completeness': validation_report.data_completeness,
+                'issues_found': len(validation_report.issues),
+                'anomaly_count': validation_report.anomaly_count,
+                'gap_count': validation_report.gap_count,
+                'critical_issues': len([i for i in validation_report.issues if i.severity.value == 'critical']),
+                'summary': validation_report.summary,
+                'validation_report': {
+                    'total_records': validation_report.total_records,
+                    'validation_date': validation_report.validation_date.isoformat(),
+                    'issues_by_severity': {
+                        'critical': len([i for i in validation_report.issues if i.severity.value == 'critical']),
+                        'error': len([i for i in validation_report.issues if i.severity.value == 'error']),
+                        'warning': len([i for i in validation_report.issues if i.severity.value == 'warning']),
+                        'info': len([i for i in validation_report.issues if i.severity.value == 'info'])
+                    }
+                }
+            }
+        
+    except Exception as e:
+        logger.error("Error in async validation", symbol=symbol, error=str(e))
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@celery_app.task(bind=True, name='app.tasks.data_collection.validate_batch_data')
+def validate_batch_data(self, symbols: List[str] = None, days_lookback: int = 30):
+    """
+    Celery task to validate data quality for multiple symbols
+    
+    Args:
+        symbols: List of symbols to validate (None for all available)
+        days_lookback: Number of days to look back for validation
+    """
+    task_id = self.request.id
+    symbols_count = len(symbols) if symbols else "all available"
+    logger.info("Starting batch data validation", 
+               symbols_count=symbols_count, days_lookback=days_lookback, task_id=task_id)
+    
+    try:
+        # Run the async batch validation
+        result = asyncio.run(_async_validate_batch(symbols, days_lookback, task_id))
+        
+        logger.info("Batch data validation completed", 
+                   validated_symbols=result['validated_symbols'], 
+                   avg_quality_score=result.get('avg_quality_score', 0), 
+                   task_id=task_id)
+        
+        return {
+            'status': 'completed',
+            'symbols_requested': len(symbols) if symbols else result.get('total_symbols', 0),
+            **result
+        }
+        
+    except Exception as e:
+        logger.error("Unexpected error in batch validation task", 
+                    error=str(e), task_id=task_id)
+        return {
+            'status': 'failed',
+            'error': str(e)
+        }
+
+
+async def _async_validate_batch(symbols: List[str], days_lookback: int, task_id: str) -> dict:
+    """Async helper function for batch validation"""
+    try:
+        from app.data.processors.validation import BatchDataValidator
+        
+        batch_validator = BatchDataValidator()
+        
+        async with AsyncSessionLocal() as db_session:
+            # Update task progress
+            if hasattr(current_task, 'update_state'):
+                current_task.update_state(
+                    state='PROGRESS',
+                    meta={'current': 10, 'total': 100, 'status': 'Starting batch validation'}
+                )
+            
+            # Perform batch validation
+            validation_reports = await batch_validator.validate_asx200_batch(
+                db_session, symbols, days_lookback
+            )
+            
+            # Update task progress
+            if hasattr(current_task, 'update_state'):
+                current_task.update_state(
+                    state='PROGRESS',
+                    meta={'current': 80, 'total': 100, 'status': 'Generating batch summary'}
+                )
+            
+            # Generate batch summary
+            batch_summary = batch_validator.generate_batch_summary(validation_reports)
+            
+            # Log batch validation statistics
+            await _log_batch_validation_stats(task_id, validation_reports)
+            
+            # Update task progress
+            if hasattr(current_task, 'update_state'):
+                current_task.update_state(
+                    state='PROGRESS',
+                    meta={'current': 100, 'total': 100, 'status': 'Batch validation completed'}
+                )
+            
+            # Calculate summary statistics
+            total_symbols = len(validation_reports)
+            avg_quality_score = sum(r.quality_score for r in validation_reports.values()) / total_symbols if total_symbols > 0 else 0
+            total_issues = sum(len(r.issues) for r in validation_reports.values())
+            symbols_with_critical = len([r for r in validation_reports.values() 
+                                       if any(i.severity.value == 'critical' for i in r.issues)])
+            
+            return {
+                'validated_symbols': total_symbols,
+                'avg_quality_score': round(avg_quality_score, 1),
+                'total_issues_found': total_issues,
+                'symbols_with_critical_issues': symbols_with_critical,
+                'batch_summary': batch_summary,
+                'symbol_reports': {
+                    symbol: {
+                        'quality_score': report.quality_score,
+                        'data_completeness': report.data_completeness,
+                        'issues_count': len(report.issues),
+                        'critical_issues': len([i for i in report.issues if i.severity.value == 'critical']),
+                        'summary_status': report.summary.get('data_integrity', 'unknown')
+                    }
+                    for symbol, report in validation_reports.items()
+                }
+            }
+        
+    except Exception as e:
+        logger.error("Error in async batch validation", error=str(e))
+        return {
+            'validated_symbols': 0,
+            'error': str(e)
+        }
+
+
+async def _log_validation_stats(task_id: str, symbol: str, validation_report):
+    """Log validation statistics to database"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            api_request = ApiRequest(
+                request_type='DATA_VALIDATION',
+                req_id=hash(task_id) % 10000,
+                symbol=symbol,
+                timestamp=datetime.now(),
+                status='SUCCESS' if validation_report.quality_score >= 70 else 'WARNING',
+                client_id=settings.ibkr_client_id,
+                response_time_ms=0
+            )
+            
+            db_session.add(api_request)
+            await db_session.commit()
+            
+            logger.debug("Validation stats logged", 
+                        symbol=symbol, quality_score=validation_report.quality_score)
+                        
+        except Exception as e:
+            logger.error("Failed to log validation stats", symbol=symbol, error=str(e))
+
+
+async def _log_batch_validation_stats(task_id: str, validation_reports: dict):
+    """Log batch validation statistics to database"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            total_symbols = len(validation_reports)
+            avg_quality = sum(r.quality_score for r in validation_reports.values()) / total_symbols if total_symbols > 0 else 0
+            
+            api_request = ApiRequest(
+                request_type='BATCH_VALIDATION',
+                req_id=hash(task_id) % 10000,
+                timestamp=datetime.now(),
+                status='SUCCESS' if avg_quality >= 70 else 'WARNING',
+                client_id=settings.ibkr_client_id,
+                response_time_ms=0
+            )
+            
+            db_session.add(api_request)
+            await db_session.commit()
+            
+            logger.debug("Batch validation stats logged", 
+                        symbols_count=total_symbols, avg_quality_score=avg_quality)
+                        
+        except Exception as e:
+            logger.error("Failed to log batch validation stats", error=str(e))
