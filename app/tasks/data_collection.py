@@ -8,8 +8,10 @@ from celery import current_task
 
 from app.tasks.celery_app import celery_app
 from app.data.collectors.market_data import MarketDataCollector
-from app.data.collectors.asx_contracts import get_asx200_symbols, get_liquid_stocks
-from app.data.models.market import DailyPrice, ApiRequest
+from app.data.collectors.historical_collector import HistoricalDataCollector
+from app.data.services.watchlist_service import WatchlistService
+from app.data.models.market import DailyPrice, IntradayPrice, ApiRequest
+from app.utils.rate_limiter import IBKRRateLimiter
 from app.config.database import AsyncSessionLocal
 from app.config.settings import settings
 
@@ -72,9 +74,11 @@ async def _async_collect_daily_data(symbols: Optional[List[str]], task_id: str) 
                 'error': 'Failed to connect to IBKR TWS'
             }
         
-        # Use default ASX200 symbols if none provided
+        # Use all symbols from database if none provided
         if symbols is None:
-            symbols = get_asx200_symbols()
+            watchlist_service = WatchlistService()
+            symbol_info_list = await watchlist_service.get_all_symbols_for_daily_collection()
+            symbols = [info.symbol for info in symbol_info_list]
         
         logger.info("Collecting data for symbols", count=len(symbols))
         
@@ -110,29 +114,58 @@ async def _async_collect_daily_data(symbols: Optional[List[str]], task_id: str) 
         }
 
 
-@celery_app.task(bind=True, name='app.tasks.data_collection.collect_sample_data')
-def collect_sample_data(self, max_symbols: int = 10):
+@celery_app.task(bind=True, name='app.tasks.data_collection.collect_intraday_data')
+def collect_intraday_data(self, timeframe: str = "5min", max_symbols: int = None):
     """
-    Collect sample data for testing/development
-    Uses most liquid ASX stocks for faster testing
+    Collect intraday data for symbols from active watchlists
+    Runs during market hours only
+    
+    Args:
+        timeframe: Bar timeframe ('5min', '15min', '1hour') 
+        max_symbols: Limit number of symbols (None = no limit)
     """
     task_id = self.request.id
-    logger.info("Starting sample data collection", 
-               max_symbols=max_symbols, task_id=task_id)
+    logger.info("Starting intraday data collection", 
+               timeframe=timeframe, max_symbols=max_symbols, task_id=task_id)
     
     try:
-        symbols = get_liquid_stocks(max_symbols)
-        result = asyncio.run(_async_collect_daily_data(symbols, task_id))
+        result = asyncio.run(_async_collect_intraday_data(timeframe, max_symbols, task_id))
         
         return {
             'status': 'success' if result['success'] else 'failed',
-            'symbols': symbols,
+            'timeframe': timeframe,
             **result
         }
         
     except Exception as e:
-        logger.error("Sample data collection failed", error=str(e), task_id=task_id)
-        raise self.retry(countdown=60, max_retries=2)  # Retry in 1 minute
+        logger.error("Intraday data collection failed", 
+                    timeframe=timeframe, error=str(e), task_id=task_id)
+        raise self.retry(countdown=300, max_retries=2)  # Retry in 5 minutes
+
+
+@celery_app.task(bind=True, name='app.tasks.data_collection.collect_high_priority_data') 
+def collect_high_priority_data(self, timeframe: str = "5min"):
+    """
+    Collect intraday data for high-priority symbols only
+    Faster collection for most important stocks
+    """
+    task_id = self.request.id
+    logger.info("Starting high priority data collection", 
+               timeframe=timeframe, task_id=task_id)
+    
+    try:
+        result = asyncio.run(_async_collect_high_priority_data(timeframe, task_id))
+        
+        return {
+            'status': 'success' if result['success'] else 'failed',
+            'timeframe': timeframe,
+            **result
+        }
+        
+    except Exception as e:
+        logger.error("High priority data collection failed", 
+                    timeframe=timeframe, error=str(e), task_id=task_id)
+        raise self.retry(countdown=180, max_retries=3)  # Retry in 3 minutes
 
 
 @celery_app.task(bind=True, name='app.tasks.data_collection.validate_daily_data')
@@ -163,6 +196,153 @@ def validate_daily_data(self):
             'status': 'error',
             'error': str(e)
         }
+
+
+async def _async_collect_intraday_data(timeframe: str, max_symbols: int, task_id: str) -> dict:
+    """Enhanced async helper for intraday data collection using watchlists"""
+    start_time = datetime.now()
+    collected_count = 0
+    error_count = 0
+    
+    # Initialize rate limiter and watchlist service
+    async with IBKRRateLimiter() as rate_limiter:
+        try:
+            # Get symbols from watchlists that support this timeframe
+            watchlist_service = WatchlistService()
+            intraday_symbols = await watchlist_service.get_symbols_by_timeframe(timeframe)
+            
+            if not intraday_symbols:
+                return {
+                    'success': False,
+                    'error': f'No symbols configured for {timeframe} timeframe'
+                }
+            
+            # Limit symbols if requested
+            if max_symbols and max_symbols < len(intraday_symbols):
+                intraday_symbols = intraday_symbols[:max_symbols]
+                logger.info("Limited symbols for collection", 
+                           original=len(intraday_symbols), limited_to=max_symbols)
+            
+            # Initialize market data collector
+            collector = MarketDataCollector(rate_limiter=rate_limiter)
+            
+            if not await collector.start_collection():
+                return {
+                    'success': False,
+                    'error': 'Failed to connect to IBKR TWS'
+                }
+            
+            # Extract just symbols for collection
+            symbols = [s.symbol for s in intraday_symbols]
+            
+            logger.info("Collecting intraday data", 
+                       timeframe=timeframe, symbols_count=len(symbols))
+            
+            # Collect intraday data
+            success = await collector.collect_intraday_bars(symbols, timeframe)
+            
+            if success:
+                collected_count = len(symbols)
+            else:
+                error_count = len(symbols)
+            
+            await collector.stop_collection()
+            
+            # Log collection statistics
+            await _log_collection_stats(task_id, collected_count, error_count, 
+                                       data_type=f"intraday_{timeframe}")
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            
+            return {
+                'success': success,
+                'collected_count': collected_count,
+                'error_count': error_count,
+                'duration_seconds': duration,
+                'symbols_processed': len(symbols),
+                'timeframe': timeframe
+            }
+            
+        except Exception as e:
+            logger.error("Error in intraday data collection", 
+                        timeframe=timeframe, error=str(e))
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+
+async def _async_collect_high_priority_data(timeframe: str, task_id: str) -> dict:
+    """Async helper for high-priority symbol collection"""
+    start_time = datetime.now()
+    collected_count = 0
+    error_count = 0
+    
+    async with IBKRRateLimiter() as rate_limiter:
+        try:
+            # Get high-priority symbols (priority >= 8)
+            watchlist_service = WatchlistService()
+            high_priority_symbols = await watchlist_service.get_high_priority_symbols(
+                min_priority=8, active_only=True
+            )
+            
+            # Filter by timeframe
+            filtered_symbols = [
+                s for s in high_priority_symbols 
+                if timeframe in s.timeframes
+            ]
+            
+            if not filtered_symbols:
+                return {
+                    'success': False,
+                    'error': f'No high-priority symbols support {timeframe} timeframe'
+                }
+            
+            collector = MarketDataCollector(rate_limiter=rate_limiter)
+            
+            if not await collector.start_collection():
+                return {
+                    'success': False,
+                    'error': 'Failed to connect to IBKR TWS'
+                }
+            
+            symbols = [s.symbol for s in filtered_symbols]
+            
+            logger.info("Collecting high-priority intraday data", 
+                       timeframe=timeframe, symbols_count=len(symbols),
+                       min_priority=8)
+            
+            success = await collector.collect_intraday_bars(symbols, timeframe)
+            
+            if success:
+                collected_count = len(symbols)
+            else:
+                error_count = len(symbols)
+                
+            await collector.stop_collection()
+            
+            await _log_collection_stats(task_id, collected_count, error_count,
+                                       data_type=f"high_priority_{timeframe}")
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            
+            return {
+                'success': success,
+                'collected_count': collected_count,
+                'error_count': error_count,
+                'duration_seconds': duration,
+                'symbols_processed': len(symbols),
+                'timeframe': timeframe,
+                'priority_filter': 8
+            }
+            
+        except Exception as e:
+            logger.error("Error in high-priority data collection", 
+                        timeframe=timeframe, error=str(e))
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
 
 async def _async_validate_data(task_id: str) -> dict:
@@ -230,12 +410,13 @@ async def _async_validate_data(task_id: str) -> dict:
     }
 
 
-async def _log_collection_stats(task_id: str, collected: int, errors: int):
+async def _log_collection_stats(task_id: str, collected: int, errors: int, 
+                               data_type: str = "daily"):
     """Log collection statistics to database"""
     async with AsyncSessionLocal() as db_session:
         try:
             api_request = ApiRequest(
-                request_type='DATA_COLLECTION',
+                request_type=f'DATA_COLLECTION_{data_type.upper()}',
                 req_id=hash(task_id) % 10000,  # Convert task_id to int
                 timestamp=datetime.now(),
                 status='SUCCESS' if errors == 0 else 'PARTIAL_SUCCESS',
@@ -247,7 +428,7 @@ async def _log_collection_stats(task_id: str, collected: int, errors: int):
             await db_session.commit()
             
             logger.debug("Collection stats logged", 
-                        collected=collected, errors=errors)
+                        collected=collected, errors=errors, data_type=data_type)
                         
         except Exception as e:
             logger.error("Failed to log collection stats", error=str(e))

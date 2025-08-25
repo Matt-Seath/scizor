@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.data.collectors.ibkr_client import IBKRClient
-from app.data.collectors.asx_contracts import create_asx_stock_contract, get_asx200_symbols
+from app.utils.ibkr_contracts import create_asx_stock_contract
+from app.data.services.watchlist_service import WatchlistService
 from app.data.models.market import DailyPrice, ApiRequest
 from app.config.database import AsyncSessionLocal
 from app.config.settings import settings

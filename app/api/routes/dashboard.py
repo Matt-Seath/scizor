@@ -6,7 +6,7 @@ import structlog
 
 from app.config.database import get_async_db
 from app.data.collectors.market_data import MarketDataCollector
-from app.data.collectors.asx_contracts import get_asx200_symbols, get_liquid_stocks
+from app.data.services.watchlist_service import WatchlistService
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()

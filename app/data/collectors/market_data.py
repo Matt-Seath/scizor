@@ -8,11 +8,8 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.collectors.ibkr_client import IBKRClient
-from app.data.collectors.asx_contracts import (
-    create_asx_stock_contract, 
-    get_asx200_symbols, 
-    get_liquid_stocks
-)
+from app.utils.ibkr_contracts import create_asx_stock_contract
+from app.data.services.watchlist_service import WatchlistService
 from app.data.models.market import DailyPrice, IntradayPrice, ApiRequest, ConnectionState
 from app.config.database import AsyncSessionLocal
 from app.config.settings import settings

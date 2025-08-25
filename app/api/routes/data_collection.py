@@ -7,7 +7,7 @@ import structlog
 
 from app.config.database import get_async_db
 from app.data.models.market import DailyPrice, ApiRequest
-from app.data.collectors.asx_contracts import get_asx200_symbols, get_liquid_stocks
+from app.data.services.watchlist_service import WatchlistService
 from app.tasks.data_collection import (
     collect_daily_asx_data, 
     collect_sample_data,

@@ -1,0 +1,229 @@
+[
+  {
+    "name": "High Priority",
+    "description": "Most liquid ASX stocks for intraday collection",
+    "is_active": true,
+    "symbols": [
+      {
+        "symbol": "BHP",
+        "priority": 10,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "CBA",
+        "priority": 10,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "CSL",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "ANZ",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "WBC",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "NAB",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "WES",
+        "priority": 8,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "MQG",
+        "priority": 8,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "TLS",
+        "priority": 7,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "WOW",
+        "priority": 7,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "RIO",
+        "priority": 8,
+        "collect_intraday": true,
+        "timeframes": "5min,15min,1hour"
+      },
+      {
+        "symbol": "NCM",
+        "priority": 7,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      }
+    ]
+  },
+  {
+    "name": "ASX200 Banks",
+    "description": "Major ASX banking stocks",
+    "is_active": true,
+    "symbols": [
+      {
+        "symbol": "CBA",
+        "priority": 10,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "ANZ",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "WBC",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "NAB",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "MQG",
+        "priority": 8,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "BOQ",
+        "priority": 5,
+        "collect_intraday": false,
+        "timeframes": "1hour"
+      }
+    ]
+  },
+  {
+    "name": "ASX200 Miners",
+    "description": "Major ASX mining stocks",
+    "is_active": true,
+    "symbols": [
+      {
+        "symbol": "BHP",
+        "priority": 10,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "RIO",
+        "priority": 9,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "FMG",
+        "priority": 8,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "NCM",
+        "priority": 7,
+        "collect_intraday": true,
+        "timeframes": "15min,1hour"
+      },
+      {
+        "symbol": "STO",
+        "priority": 6,
+        "collect_intraday": false,
+        "timeframes": "1hour"
+      },
+      {
+        "symbol": "WPL",
+        "priority": 6,
+        "collect_intraday": false,
+        "timeframes": "1hour"
+      }
+    ]
+  },
+  {
+    "name": "Tech Stocks",
+    "description": "ASX technology and growth stocks",
+    "is_active": true,
+    "symbols": [
+      {
+        "symbol": "XRO",
+        "priority": 8,
+        "collect_intraday": true,
+        "timeframes": "5min,15min"
+      },
+      {
+        "symbol": "CPU",
+        "priority": 7,
+        "collect_intraday": true,
+        "timeframes": "5min,15min"
+      },
+      {
+        "symbol": "APT",
+        "priority": 6,
+        "collect_intraday": true,
+        "timeframes": "5min,15min"
+      },
+      {
+        "symbol": "ZIP",
+        "priority": 4,
+        "collect_intraday": false,
+        "timeframes": "15min"
+      },
+      {
+        "symbol": "TNE",
+        "priority": 5,
+        "collect_intraday": false,
+        "timeframes": "15min"
+      }
+    ]
+  },
+  {
+    "name": "REITs",
+    "description": "Real Estate Investment Trusts",
+    "is_active": false,
+    "symbols": [
+      {
+        "symbol": "GMG",
+        "priority": 6,
+        "collect_intraday": false,
+        "timeframes": "1hour"
+      },
+      {
+        "symbol": "SCG",
+        "priority": 5,
+        "collect_intraday": false,
+        "timeframes": "1hour"
+      },
+      {
+        "symbol": "VCX",
+        "priority": 4,
+        "collect_intraday": false,
+        "timeframes": "1hour"
+      }
+    ]
+  }
+]

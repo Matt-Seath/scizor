@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DECIMAL, BIGINT, Date, DateTime, Boolean, Text, Index
+from sqlalchemy import Column, Integer, String, DECIMAL, BIGINT, Date, DateTime, Boolean, Text, Index, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.config.database import Base
 
@@ -221,3 +222,59 @@ class MarketDataSubscription(Base):
         Index('idx_subscriptions_symbol_status', 'symbol', 'status'),
         Index('idx_subscriptions_subscribed_at', 'subscribed_at'),
     )
+
+
+class Watchlist(Base):
+    """User-defined watchlists for market data collection"""
+    __tablename__ = "watchlists"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False, unique=True)
+    description = Column(Text)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=func.current_timestamp())
+    updated_at = Column(DateTime, default=func.current_timestamp(), onupdate=func.current_timestamp())
+    
+    # Relationship to watchlist symbols
+    symbols = relationship("WatchlistSymbol", back_populates="watchlist", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Watchlist(name='{self.name}', active={self.is_active})>"
+
+
+class WatchlistSymbol(Base):
+    """Symbols within a watchlist with collection preferences"""
+    __tablename__ = "watchlist_symbols"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    watchlist_id = Column(Integer, ForeignKey('watchlists.id', ondelete='CASCADE'), nullable=False)
+    symbol = Column(String(10), nullable=False)
+    con_id = Column(BIGINT, ForeignKey('contract_details.con_id'), nullable=True)
+    priority = Column(Integer, default=1)  # Higher number = higher priority
+    collect_intraday = Column(Boolean, default=True, nullable=False)
+    timeframes = Column(Text, default='5min,15min,1hour')  # Comma-separated list
+    added_at = Column(DateTime, default=func.current_timestamp())
+    
+    # Relationships
+    watchlist = relationship("Watchlist", back_populates="symbols")
+    contract_detail = relationship("ContractDetail", foreign_keys=[con_id])
+    
+    __table_args__ = (
+        Index('idx_watchlist_symbols_unique', 'watchlist_id', 'symbol', unique=True),
+        Index('idx_watchlist_symbols_active', 'watchlist_id', 'collect_intraday'),
+        Index('idx_watchlist_symbols_symbol', 'symbol'),
+        Index('idx_watchlist_symbols_priority', 'watchlist_id', 'priority'),
+    )
+    
+    def __repr__(self):
+        return f"<WatchlistSymbol(symbol='{self.symbol}', priority={self.priority})>"
+    
+    def get_timeframes(self) -> list:
+        """Parse timeframes string into list"""
+        if not self.timeframes:
+            return []
+        return [tf.strip() for tf in self.timeframes.split(',') if tf.strip()]
+    
+    def set_timeframes(self, timeframes: list):
+        """Set timeframes from list"""
+        self.timeframes = ','.join(timeframes) if timeframes else ''
