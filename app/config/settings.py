@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     ibkr_connection_timeout: int = Field(default=30, env="IBKR_CONNECTION_TIMEOUT")
     ibkr_request_timeout: int = Field(default=10, env="IBKR_REQUEST_TIMEOUT")
     
+    # IBKR Rate Limiting Configuration
+    ibkr_general_rate_limit: int = Field(default=40, env="IBKR_GENERAL_RATE_LIMIT")
+    ibkr_general_window_seconds: int = Field(default=1, env="IBKR_GENERAL_WINDOW_SECONDS")
+    ibkr_historical_rate_limit: int = Field(default=60, env="IBKR_HISTORICAL_RATE_LIMIT")
+    ibkr_historical_window_seconds: int = Field(default=600, env="IBKR_HISTORICAL_WINDOW_SECONDS")
+    ibkr_market_data_rate_limit: int = Field(default=100, env="IBKR_MARKET_DATA_RATE_LIMIT")
+    ibkr_market_data_window_seconds: int = Field(default=60, env="IBKR_MARKET_DATA_WINDOW_SECONDS")
+    ibkr_identical_request_window_seconds: int = Field(default=15, env="IBKR_IDENTICAL_REQUEST_WINDOW_SECONDS")
+    ibkr_rate_violation_penalty_seconds: int = Field(default=60, env="IBKR_RATE_VIOLATION_PENALTY_SECONDS")
+    
     # Trading Configuration
     max_positions: int = Field(default=5, env="MAX_POSITIONS")
     max_risk_per_trade: float = Field(default=0.02, env="MAX_RISK_PER_TRADE")

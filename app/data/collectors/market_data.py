@@ -13,9 +13,10 @@ from app.data.collectors.asx_contracts import (
     get_asx200_symbols, 
     get_liquid_stocks
 )
-from app.data.models.market import DailyPrice
+from app.data.models.market import DailyPrice, IntradayPrice, ApiRequest, ConnectionState
 from app.config.database import AsyncSessionLocal
 from app.config.settings import settings
+from app.utils.rate_limiter import IBKRRateLimiter, RequestType, rate_limited_request
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
@@ -109,11 +110,14 @@ class MarketDataCollector:
     Handles rate limiting, data validation, and storage
     """
     
-    def __init__(self):
+    def __init__(self, rate_limiter: IBKRRateLimiter = None):
         self.ibkr_client = IBKRClient()
         self.market_hours = ASXMarketHours()
+        self.rate_limiter = rate_limiter
+        self._rate_limiter_owned = False
         self.active_subscriptions: Dict[int, str] = {}
         self.data_storage: Dict[str, List[MarketDataPoint]] = {}
+        self.intraday_buffer: Dict[str, List[MarketDataPoint]] = {}  # Buffer for intraday aggregation
         self.collection_stats = {
             "requests_made": 0,
             "successful_responses": 0,
@@ -124,21 +128,35 @@ class MarketDataCollector:
     async def start_collection(self) -> bool:
         """Start the market data collection service"""
         try:
+            # Initialize rate limiter if not provided
+            if self.rate_limiter is None:
+                self.rate_limiter = IBKRRateLimiter()
+                await self.rate_limiter.__aenter__()
+                self._rate_limiter_owned = True
+            
+            # Update connection state
+            await self._update_connection_state("CONNECTING", "Establishing connection to TWS")
+            
             # Connect to TWS
             if not self.ibkr_client.connect_to_tws():
+                await self._update_connection_state("ERROR", "Failed to connect to TWS")
                 logger.error("Failed to connect to TWS")
                 return False
             
+            await self._update_connection_state("CONNECTED", "Successfully connected to TWS")
             logger.info("Market data collector started")
             return True
             
         except Exception as e:
+            await self._update_connection_state("ERROR", f"Startup failed: {str(e)}")
             logger.error("Failed to start market data collector", error=str(e))
             return False
     
     async def stop_collection(self) -> None:
         """Stop the market data collection service"""
         try:
+            await self._update_connection_state("DISCONNECTING", "Stopping market data collection")
+            
             # Cancel all active subscriptions
             for req_id in list(self.active_subscriptions.keys()):
                 self.ibkr_client.cancel_market_data(req_id)
@@ -146,9 +164,17 @@ class MarketDataCollector:
             self.active_subscriptions.clear()
             self.ibkr_client.disconnect_from_tws()
             
+            # Clean up rate limiter if we own it
+            if self._rate_limiter_owned and self.rate_limiter:
+                await self.rate_limiter.__aexit__(None, None, None)
+                self.rate_limiter = None
+                self._rate_limiter_owned = False
+            
+            await self._update_connection_state("DISCONNECTED", "Market data collection stopped")
             logger.info("Market data collector stopped")
             
         except Exception as e:
+            await self._update_connection_state("ERROR", f"Shutdown error: {str(e)}")
             logger.error("Error stopping market data collector", error=str(e))
     
     def _market_data_callback(self, symbol: str) -> Callable:
@@ -195,44 +221,237 @@ class MarketDataCollector:
         
         return callback
     
-    async def subscribe_to_symbol(self, symbol: str) -> Optional[int]:
-        """Subscribe to real-time market data for a symbol"""
+    async def _update_connection_state(self, status: str, message: str = None):
+        """Update connection state in database"""
         try:
-            contract = create_asx_stock_contract(symbol)
-            callback = self._market_data_callback(symbol)
-            
-            req_id = self.ibkr_client.request_market_data(contract, callback)
-            
-            if req_id:
-                self.active_subscriptions[req_id] = symbol
-                self.collection_stats["requests_made"] += 1
-                logger.info("Subscribed to market data", symbol=symbol, req_id=req_id)
-                return req_id
-            else:
-                logger.error("Failed to subscribe to market data", symbol=symbol)
-                return None
+            async with AsyncSessionLocal() as db_session:
+                # Upsert connection state
+                stmt = insert(ConnectionState).values(
+                    client_id=settings.ibkr_client_id,
+                    status=status,
+                    last_heartbeat=datetime.now(),
+                    connection_started_at=datetime.now() if status == "CONNECTED" else None,
+                    last_data_received_at=datetime.now() if status in ["CONNECTED", "RECEIVING_DATA"] else None,
+                    last_error_message=message if status == "ERROR" else None
+                )
                 
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=['client_id'],
+                    set_={
+                        'status': stmt.excluded.status,
+                        'last_heartbeat': stmt.excluded.last_heartbeat,
+                        'last_error_message': stmt.excluded.last_error_message,
+                        'connection_started_at': stmt.excluded.connection_started_at,
+                        'last_data_received_at': stmt.excluded.last_data_received_at
+                    }
+                )
+                
+                await db_session.execute(stmt)
+                await db_session.commit()
+                
+        except Exception as e:
+            logger.error("Failed to update connection state", error=str(e))
+    
+    async def _validate_market_data_point(self, data_point: MarketDataPoint) -> bool:
+        """Validate market data point for basic sanity checks"""
+        try:
+            # Basic validation rules
+            if data_point.price and data_point.price <= 0:
+                logger.warning("Invalid price received", symbol=data_point.symbol, price=data_point.price)
+                return False
+            
+            if data_point.volume and data_point.volume < 0:
+                logger.warning("Invalid volume received", symbol=data_point.symbol, volume=data_point.volume)
+                return False
+            
+            # Price range checks (ASX stocks typically $0.01 to $1000)
+            if data_point.price and (data_point.price < 0.001 or data_point.price > 10000):
+                logger.warning("Price outside expected range", 
+                             symbol=data_point.symbol, price=data_point.price)
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error("Error validating market data point", symbol=data_point.symbol, error=str(e))
+            return False
+    
+    async def subscribe_to_symbol(self, symbol: str) -> Optional[int]:
+        """Subscribe to real-time market data for a symbol with rate limiting"""
+        if not self.rate_limiter:
+            logger.error("Rate limiter not initialized")
+            return None
+            
+        try:
+            # Use rate-limited request context
+            async with rate_limited_request(
+                self.rate_limiter, 
+                RequestType.MARKET_DATA,
+                symbol=symbol
+            ):
+                contract = create_asx_stock_contract(symbol)
+                callback = self._market_data_callback(symbol)
+                
+                req_id = self.ibkr_client.request_market_data(contract, callback)
+                
+                if req_id:
+                    self.active_subscriptions[req_id] = symbol
+                    self.collection_stats["requests_made"] += 1
+                    logger.info("Subscribed to market data", symbol=symbol, req_id=req_id)
+                    return req_id
+                else:
+                    logger.error("Failed to subscribe to market data", symbol=symbol)
+                    return None
+                    
         except Exception as e:
             logger.error("Error subscribing to market data", 
                         symbol=symbol, error=str(e))
+            self.collection_stats["errors"] += 1
             return None
     
     async def subscribe_to_asx200_sample(self, max_symbols: int = 10) -> List[int]:
-        """Subscribe to a sample of ASX200 stocks for testing"""
+        """Subscribe to a sample of ASX200 stocks for testing with proper rate limiting"""
         symbols = get_liquid_stocks(max_symbols)
         request_ids = []
         
-        for symbol in symbols:
+        logger.info("Starting batch subscription", symbols_count=len(symbols))
+        
+        for i, symbol in enumerate(symbols):
             req_id = await self.subscribe_to_symbol(symbol)
             if req_id:
                 request_ids.append(req_id)
             
-            # Rate limiting delay
-            await asyncio.sleep(0.1)  # 100ms between requests
+            # Progress logging
+            if (i + 1) % 5 == 0:
+                logger.info("Subscription progress", completed=i+1, total=len(symbols))
         
-        logger.info("Subscribed to ASX200 sample", 
-                   symbols=len(request_ids), total=len(symbols))
+        logger.info("Completed batch subscription", 
+                   successful=len(request_ids), total=len(symbols))
         return request_ids
+    
+    async def collect_intraday_bars(self, symbols: List[str], timeframe: str = "5min") -> bool:
+        """
+        Collect intraday bars for specified symbols and timeframe
+        
+        Args:
+            symbols: List of symbols to collect data for
+            timeframe: Bar timeframe ('5min', '15min', '1hour')
+            
+        Returns:
+            True if collection was successful
+        """
+        if not self.rate_limiter:
+            logger.error("Rate limiter not initialized for intraday collection")
+            return False
+        
+        # Check if market is open for intraday collection
+        if not self.market_hours.is_market_open():
+            logger.warning("Market is closed, skipping intraday collection")
+            return False
+        
+        logger.info("Starting intraday data collection", 
+                   symbols_count=len(symbols), timeframe=timeframe)
+        
+        successful_collections = 0
+        
+        for i, symbol in enumerate(symbols):
+            try:
+                # Use rate-limited historical data request for intraday bars
+                async with rate_limited_request(
+                    self.rate_limiter,
+                    RequestType.HISTORICAL,
+                    symbol=symbol
+                ):
+                    contract = create_asx_stock_contract(symbol)
+                    
+                    # Map timeframe to IBKR format
+                    bar_size_map = {
+                        "5min": "5 mins",
+                        "15min": "15 mins", 
+                        "1hour": "1 hour"
+                    }
+                    
+                    duration_map = {
+                        "5min": "2 D",    # 2 days of 5-min bars
+                        "15min": "1 W",   # 1 week of 15-min bars
+                        "1hour": "1 M"    # 1 month of 1-hour bars
+                    }
+                    
+                    bar_size = bar_size_map.get(timeframe, "5 mins")
+                    duration = duration_map.get(timeframe, "1 D")
+                    
+                    # Create data buffer for this request
+                    data_buffer = []
+                    callback = self._historical_data_callback(symbol, data_buffer)
+                    
+                    req_id = self.ibkr_client.request_historical_data(
+                        contract, duration, bar_size, callback
+                    )
+                    
+                    if req_id:
+                        # Wait for data collection to complete
+                        await asyncio.sleep(2)  # Give time for data to arrive
+                        
+                        # Store intraday bars in database
+                        if data_buffer:
+                            stored_count = await self._store_intraday_bars(
+                                data_buffer, symbol, timeframe
+                            )
+                            if stored_count > 0:
+                                successful_collections += 1
+                                logger.debug("Stored intraday bars", 
+                                           symbol=symbol, bars=stored_count, timeframe=timeframe)
+                    
+                # Progress logging
+                if (i + 1) % 10 == 0:
+                    logger.info("Intraday collection progress", 
+                               completed=i+1, total=len(symbols), successful=successful_collections)
+                    
+            except Exception as e:
+                logger.error("Error collecting intraday data", symbol=symbol, error=str(e))
+                self.collection_stats["errors"] += 1
+        
+        logger.info("Intraday collection completed", 
+                   successful=successful_collections, total=len(symbols), timeframe=timeframe)
+        
+        return successful_collections > 0
+    
+    async def _store_intraday_bars(self, bars: List[HistoricalBar], symbol: str, timeframe: str) -> int:
+        """Store intraday bars in database"""
+        stored_count = 0
+        
+        async with AsyncSessionLocal() as db_session:
+            try:
+                for bar in bars:
+                    # Use UPSERT to handle duplicates
+                    stmt = insert(IntradayPrice).values(
+                        symbol=symbol,
+                        datetime=bar.date,
+                        open=bar.open,
+                        high=bar.high,
+                        low=bar.low,
+                        close=bar.close,
+                        volume=bar.volume,
+                        timeframe=timeframe,
+                        created_at=datetime.now()
+                    )
+                    
+                    stmt = stmt.on_conflict_do_nothing(
+                        index_elements=['symbol', 'datetime', 'timeframe']
+                    )
+                    
+                    await db_session.execute(stmt)
+                    stored_count += 1
+                
+                await db_session.commit()
+                logger.debug("Stored intraday bars", symbol=symbol, count=stored_count)
+                
+            except Exception as e:
+                await db_session.rollback()
+                logger.error("Error storing intraday bars", symbol=symbol, error=str(e))
+                raise
+        
+        return stored_count
     
     def _historical_data_callback(self, symbol: str, data_buffer: List[HistoricalBar]) -> Callable:
         """Create callback for historical data that stores in buffer for async processing"""
@@ -339,8 +558,12 @@ class MarketDataCollector:
     async def collect_daily_data(self, symbols: List[str] = None) -> bool:
         """
         Collect daily historical data for ASX200 stocks
-        Respects rate limits and market hours
+        Uses proper rate limiting and market hours validation
         """
+        if not self.rate_limiter:
+            logger.error("Rate limiter not initialized for daily collection")
+            return False
+            
         if symbols is None:
             symbols = get_asx200_symbols()
         
@@ -361,44 +584,46 @@ class MarketDataCollector:
                        wait_minutes=wait_time.total_seconds() / 60)
             await asyncio.sleep(wait_time.total_seconds())
         
-        logger.info("Starting daily data collection", symbols=len(symbols))
+        logger.info("Starting rate-limited daily data collection", symbols_count=len(symbols))
         
         successful_collections = 0
         symbol_data_buffers = {}  # Store data buffers for each symbol
         pending_requests = {}     # Track pending request IDs
         
-        # Phase 1: Submit all historical data requests
+        # Phase 1: Submit all historical data requests with rate limiting
         for i, symbol in enumerate(symbols):
             try:
-                contract = create_asx_stock_contract(symbol)
-                
-                # Create data buffer for this symbol
-                data_buffer = []
-                symbol_data_buffers[symbol] = data_buffer
-                
-                callback = self._historical_data_callback(symbol, data_buffer)
-                
-                req_id = self.ibkr_client.request_historical_data(
-                    contract, "1 D", "1 day", callback
-                )
-                
-                if req_id:
-                    pending_requests[req_id] = symbol
-                    successful_collections += 1
-                    self.collection_stats["requests_made"] += 1
+                # Use rate-limited request context for historical data
+                async with rate_limited_request(
+                    self.rate_limiter,
+                    RequestType.HISTORICAL,
+                    symbol=symbol
+                ):
+                    contract = create_asx_stock_contract(symbol)
                     
-                    logger.debug("Submitted historical data request", 
-                               symbol=symbol, req_id=req_id)
+                    # Create data buffer for this symbol
+                    data_buffer = []
+                    symbol_data_buffers[symbol] = data_buffer
+                    
+                    callback = self._historical_data_callback(symbol, data_buffer)
+                    
+                    req_id = self.ibkr_client.request_historical_data(
+                        contract, "1 D", "1 day", callback
+                    )
+                    
+                    if req_id:
+                        pending_requests[req_id] = symbol
+                        self.collection_stats["requests_made"] += 1
+                        
+                        logger.debug("Submitted historical data request", 
+                                   symbol=symbol, req_id=req_id)
                 
-                # Rate limiting: batch processing with delays
-                if (i + 1) % 10 == 0:  # Every 10 requests
-                    logger.info("Processing batch", completed=i+1, total=len(symbols))
-                    await asyncio.sleep(2)  # 2 second pause between batches
-                else:
-                    await asyncio.sleep(0.1)  # 100ms between individual requests
+                # Progress logging every 20 requests
+                if (i + 1) % 20 == 0:
+                    logger.info("Daily collection progress", completed=i+1, total=len(symbols))
                     
             except Exception as e:
-                logger.error("Error submitting request for symbol", 
+                logger.error("Error submitting daily data request", 
                            symbol=symbol, error=str(e))
                 self.collection_stats["errors"] += 1
         
