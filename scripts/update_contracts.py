@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
 logger = logging.getLogger(__name__)
 
 
@@ -51,7 +51,7 @@ class ContractUpdater:
         self.ibkr_manager = IBKRManager(
             host=settings.ibkr_host,
             port=port,
-            client_id=100  # Different client ID for contract updates
+            client_id=settings.ibkr_client_id
         )
         
         # Connect with timeout from settings
