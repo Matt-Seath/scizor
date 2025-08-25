@@ -1,484 +1,384 @@
 #!/usr/bin/env python3
 """
-Script to populate contract_details table with ASX200 stock information
+Populate contract details table by validating and inserting contracts from JSON file.
+This script reads contract data from app/data/seeds/contracts.json, validates each 
+contract against IBKR TWS API, and populates the database with comprehensive contract details.
 """
-import sys
-import os
+
 import asyncio
-import time
-from pathlib import Path
-from datetime import datetime
+import json
+import logging
+import os
+import sys
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-# Add app directory to path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, project_root)
 
-import structlog
-from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import insert
-
-from app.config.database import AsyncSessionLocal
+from app.config.database import async_engine, AsyncSessionLocal
 from app.config.settings import settings
 from app.data.models.market import ContractDetail
-from app.data.collectors.ibkr_client import IBKRClient
-from app.data.collectors.asx_contracts import (
-    get_asx200_symbols, 
-    create_asx_stock_contract,
-    get_liquid_stocks
-)
+from examples.client import IBKRManager
+from ibapi.contract import Contract
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-logger = structlog.get_logger(__name__)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-class ContractDetailsCollector:
-    """Collect and store IBKR contract details for ASX200 stocks"""
+class ContractUpdater:
+    """Updates contract details by validating contracts from JSON file."""
     
-    def __init__(self):
-        self.ibkr_client = IBKRClient()
-        self.contract_details_cache = {}
-        self.collection_stats = {
-            "requested": 0,
-            "successful": 0,
-            "failed": 0,
-            "already_cached": 0
-        }
-    
-    async def populate_contract_details(self, symbols: List[str] = None, 
-                                      force_refresh: bool = False) -> Dict[str, any]:
-        """
-        Populate contract details table with ASX200 stock information
+    def __init__(self, json_file: str = "app/data/seeds/contracts.json"):
+        self.json_file = json_file
+        self.ibkr_manager = None
+        self.session = None
+        self.valid_contracts = []
+        self.invalid_contracts = []
+        self.existing_symbols = set()
         
-        Args:
-            symbols: List of symbols to process (None for all ASX200)
-            force_refresh: Whether to refresh existing contract details
+    async def __aenter__(self):
+        """Async context manager entry."""
+        # Initialize database session
+        self.session = AsyncSessionLocal()
+        
+        # Initialize IBKR connection using settings
+        port = settings.ibkr_paper_port if settings.ibkr_paper_trading else settings.ibkr_live_port
+        self.ibkr_manager = IBKRManager(
+            host=settings.ibkr_host,
+            port=port,
+            client_id=100  # Different client ID for contract updates
+        )
+        
+        # Connect with timeout from settings
+        connected = await self.ibkr_manager.connect(timeout=settings.ibkr_connection_timeout)
+        if not connected:
+            raise ConnectionError("Failed to connect to IBKR TWS API")
             
-        Returns:
-            Dictionary with collection results
-        """
-        if symbols is None:
-            symbols = get_asx200_symbols()
+        logger.info("Successfully connected to IBKR TWS API")
+        return self
         
-        logger.info("Starting contract details collection", 
-                   symbols_count=len(symbols), force_refresh=force_refresh)
-        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        if self.ibkr_manager:
+            await self.ibkr_manager.disconnect()
+        if self.session:
+            await self.session.close()
+    
+    def load_contracts_from_json(self) -> List[Dict]:
+        """Load contract data from JSON file."""
         try:
-            # Connect to IBKR
-            if not self.ibkr_client.connect_to_tws():
-                logger.error("Failed to connect to IBKR TWS")
-                return {
-                    'success': False,
-                    'error': 'Failed to connect to IBKR TWS'
+            with open(self.json_file, 'r') as f:
+                contracts = json.load(f)
+            logger.debug(f"Loaded {len(contracts)} contracts from {self.json_file}")
+            return contracts
+        except FileNotFoundError:
+            logger.error(f"Contract file {self.json_file} not found")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in contract file: {e}")
+            return []
+    
+    def save_contracts_to_json(self, contracts: List[Dict]):
+        """Save contract data back to JSON file."""
+        try:
+            with open(self.json_file, 'w') as f:
+                json.dump(contracts, f, indent=2, default=str)
+        except Exception as e:
+            logger.error(f"Error saving contract file: {e}")
+    
+    async def get_existing_symbols(self) -> set:
+        """Get existing contract symbols from database."""
+        try:
+            result = await self.session.execute(select(ContractDetail.symbol))
+            symbols = {row[0] for row in result}
+            logger.debug(f"Found {len(symbols)} existing contracts in database")
+            return symbols
+        except Exception as e:
+            logger.error(f"Database error fetching existing symbols: {e}")
+            return set()
+    
+    def create_ibkr_contract(self, contract_data: Dict) -> Contract:
+        """Create IBKR Contract object from JSON data."""
+        contract = Contract()
+        contract.symbol = contract_data["symbol"]
+        contract.secType = contract_data["sec_type"]
+        contract.currency = contract_data["currency"]
+        contract.exchange = contract_data["exchange"]
+        contract.primaryExchange = contract_data["primary_exchange"]
+        return contract
+    
+    async def validate_contract_with_ibkr(self, contract_data: Dict) -> Optional[Dict]:
+        """Validate contract against IBKR API and return enriched contract data."""
+        try:
+            logger.debug(f"Validating contract for {contract_data['symbol']}")
+            
+            ibkr_contract = self.create_ibkr_contract(contract_data)
+            details = await self.ibkr_manager.get_contract_details(ibkr_contract)
+            
+            if details and len(details) > 0:
+                detail = details[0]
+                contract_detail = detail.contract
+                
+                
+                enriched_data = {
+                    "symbol": contract_data["symbol"],
+                    "con_id": contract_detail.conId,
+                    "sec_type": contract_data["sec_type"],
+                    "currency": contract_data["currency"],
+                    "exchange": contract_data["exchange"],
+                    "primary_exchange": contract_data.get("primary_exchange"),
+                    "local_symbol": contract_detail.localSymbol,
+                    "trading_class": contract_detail.tradingClass,
+                    
+                    "long_name": getattr(detail, 'longName', None),
+                    "market_name": getattr(detail, 'marketName', None),
+                    
+                    "industry": getattr(detail, 'industry', None),
+                    "category": getattr(detail, 'category', None),
+                    "subcategory": getattr(detail, 'subcategory', None),
+                    
+                    "min_tick": getattr(detail, 'minTick', None),
+                    "price_magnifier": getattr(detail, 'priceMagnifier', 1),
+                    "md_size_multiplier": getattr(detail, 'mdSizeMultiplier', 1),
+                    
+                    "market_rule_ids": getattr(detail, 'marketRuleIds', None),
+                    "order_types": getattr(detail, 'orderTypes', None),
+                    "valid_exchanges": getattr(detail, 'validExchanges', None),
+                    
+                    "trading_hours": getattr(detail, 'tradingHours', None),
+                    "liquid_hours": getattr(detail, 'liquidHours', None),
+                    "time_zone_id": getattr(detail, 'timeZoneId', None),
+                    
+                    "sec_id_list": json.dumps([str(sec_id) for sec_id in getattr(detail, 'secIdList', [])]),
+                    "stock_type": getattr(detail, 'stockType', None),
+                    "cusip": getattr(detail, 'cusip', None),
+                    
+                    "contract_month": contract_detail.lastTradeDateOrContractMonth or None,
+                    "last_trading_day": None,
+                    "real_expiration_date": getattr(detail, 'realExpirationDate', None),
+                    "last_trade_time": getattr(detail, 'lastTradeTime', None),
+                    
+                    "bond_type": getattr(detail, 'bondType', None),
+                    "coupon_type": getattr(detail, 'couponType', None),
+                    "coupon": getattr(detail, 'coupon', None),
+                    "callable": getattr(detail, 'callable', False),
+                    "putable": getattr(detail, 'putable', False),
+                    "convertible": getattr(detail, 'convertible', False),
+                    "maturity": getattr(detail, 'maturity', None),
+                    "issue_date": getattr(detail, 'issueDate', None),
+                    "ratings": getattr(detail, 'ratings', None),
+                    
+                    "next_option_date": getattr(detail, 'nextOptionDate', None),
+                    "next_option_type": getattr(detail, 'nextOptionType', None),
+                    "next_option_partial": getattr(detail, 'nextOptionPartial', False),
+                    
+                    "under_con_id": getattr(detail, 'underConId', None),
+                    "under_symbol": getattr(detail, 'underSymbol', None),
+                    "under_sec_type": getattr(detail, 'underSecType', None),
+                    
+                    "agg_group": getattr(detail, 'aggGroup', None),
+                    "ev_rule": getattr(detail, 'evRule', None),
+                    "ev_multiplier": getattr(detail, 'evMultiplier', None),
+                    "desc_append": getattr(detail, 'descAppend', None),
+                    "notes": getattr(detail, 'notes', None)
                 }
-            
-            logger.info("Connected to IBKR TWS successfully")
-            
-            # Check existing contract details if not forcing refresh
-            existing_symbols = set()
-            if not force_refresh:
-                existing_symbols = await self._get_existing_contract_symbols()
-                logger.info("Found existing contract details", count=len(existing_symbols))
-            
-            # Process each symbol
-            failed_symbols = []
-            successful_symbols = []
-            
-            for i, symbol in enumerate(symbols):
-                try:
-                    if symbol in existing_symbols and not force_refresh:
-                        logger.debug("Skipping existing contract", symbol=symbol)
-                        self.collection_stats["already_cached"] += 1
-                        continue
-                    
-                    logger.info("Processing contract details", 
-                               symbol=symbol, progress=f"{i+1}/{len(symbols)}")
-                    
-                    # Get contract details from IBKR
-                    contract_details = await self._request_contract_details(symbol)
-                    
-                    if contract_details:
-                        # Store in database
-                        await self._store_contract_details(symbol, contract_details)
-                        successful_symbols.append(symbol)
-                        self.collection_stats["successful"] += 1
-                        logger.info("Contract details stored", symbol=symbol)
-                    else:
-                        failed_symbols.append(symbol)
-                        self.collection_stats["failed"] += 1
-                        logger.warning("Failed to get contract details", symbol=symbol)
-                    
-                    self.collection_stats["requested"] += 1
-                    
-                    # Rate limiting - be conservative with contract detail requests
-                    if i < len(symbols) - 1:
-                        await asyncio.sleep(2)  # 2 second delay between requests
-                        
-                except Exception as e:
-                    logger.error("Error processing symbol", symbol=symbol, error=str(e))
-                    failed_symbols.append(symbol)
-                    self.collection_stats["failed"] += 1
-            
-            # Disconnect from IBKR
-            self.ibkr_client.disconnect_from_tws()
-            logger.info("Disconnected from IBKR TWS")
-            
-            # Summary
-            total_processed = len(successful_symbols) + len(failed_symbols)
-            success_rate = (len(successful_symbols) / total_processed * 100) if total_processed > 0 else 0
-            
-            logger.info("Contract details collection completed", 
-                       successful=len(successful_symbols),
-                       failed=len(failed_symbols),
-                       already_cached=self.collection_stats["already_cached"],
-                       success_rate=f"{success_rate:.1f}%")
-            
-            return {
-                'success': True,
-                'symbols_processed': total_processed,
-                'successful_symbols': successful_symbols,
-                'failed_symbols': failed_symbols,
-                'already_cached': self.collection_stats["already_cached"],
-                'collection_stats': self.collection_stats,
-                'success_rate': success_rate
-            }
-            
-        except Exception as e:
-            logger.error("Contract details collection failed", error=str(e))
-            return {
-                'success': False,
-                'error': str(e)
-            }
-    
-    async def _get_existing_contract_symbols(self) -> set:
-        """Get symbols that already have contract details in database"""
-        async with AsyncSessionLocal() as db_session:
-            try:
-                from sqlalchemy import select
                 
-                result = await db_session.execute(
-                    select(ContractDetail.symbol).distinct()
-                )
-                
-                existing_symbols = set(row[0] for row in result)
-                return existing_symbols
-                
-            except Exception as e:
-                logger.error("Error getting existing contract symbols", error=str(e))
-                return set()
-    
-    async def _request_contract_details(self, symbol: str) -> Optional[Dict]:
-        """Request contract details from IBKR for a symbol"""
-        try:
-            # Create contract
-            contract = create_asx_stock_contract(symbol)
-            
-            # Setup contract details callback
-            contract_details_received = asyncio.Event()
-            received_details = {}
-            
-            def contract_details_callback(contract_details):
-                """Callback to receive contract details from IBKR"""
-                try:
-                    details = contract_details.contract
-                    summary = contract_details.summary
-                    
-                    received_details.update({
-                        'con_id': details.conId,
-                        'symbol': details.symbol,
-                        'sec_type': details.secType,
-                        'currency': details.currency,
-                        'exchange': details.exchange,
-                        'primary_exchange': details.primaryExchange,
-                        'local_symbol': details.localSymbol,
-                        'trading_class': details.tradingClass,
-                        'min_tick': summary.minTick if hasattr(summary, 'minTick') else None,
-                        'market_rule_ids': str(summary.marketRuleIds) if hasattr(summary, 'marketRuleIds') else None,
-                        'contract_month': details.contractMonth if hasattr(details, 'contractMonth') else None,
-                        'last_trading_day': details.lastTradingDay if hasattr(details, 'lastTradingDay') else None,
-                        'time_zone_id': summary.timeZoneId if hasattr(summary, 'timeZoneId') else None
-                    })
-                    
-                    logger.debug("Contract details received", 
-                               symbol=symbol, con_id=details.conId)
-                    
-                except Exception as e:
-                    logger.error("Error in contract details callback", 
-                               symbol=symbol, error=str(e))
-            
-            # Request contract details (the IBKR client handles the end callback internally)
-            req_id = self.ibkr_client.request_contract_details(contract, contract_details_callback)
-            
-            if not req_id:
-                logger.error("Failed to submit contract details request", symbol=symbol)
-                return None
-            
-            # Wait for the request to complete by checking if it's still pending
-            timeout = 30.0
-            start_time = time.time()
-            
-            while req_id in self.ibkr_client.pending_requests and (time.time() - start_time) < timeout:
-                await asyncio.sleep(0.1)
-            
-            if req_id in self.ibkr_client.pending_requests:
-                logger.warning("Contract details request timed out", symbol=symbol)
-                return None
-            
-            if received_details:
-                return received_details
+                logger.debug(f"Successfully validated {contract_data['symbol']} (ConID: {contract_detail.conId})")
+                self.valid_contracts.append(contract_data["symbol"])
+                return enriched_data
             else:
-                logger.warning("No contract details received", symbol=symbol)
+                logger.debug(f"No contract details found for {contract_data['symbol']}")
+                self.invalid_contracts.append(contract_data["symbol"])
                 return None
                 
         except Exception as e:
-            logger.error("Error requesting contract details", symbol=symbol, error=str(e))
+            logger.warning(f"Failed to validate {contract_data['symbol']}: {e}")
+            self.invalid_contracts.append(contract_data["symbol"])
             return None
     
-    async def _store_contract_details(self, symbol: str, details: Dict) -> bool:
-        """Store contract details in database"""
-        async with AsyncSessionLocal() as db_session:
-            try:
-                # Create ContractDetail object
-                contract_detail = ContractDetail(
-                    symbol=details['symbol'],
-                    con_id=details['con_id'],
-                    sec_type=details['sec_type'],
-                    currency=details['currency'],
-                    exchange=details['exchange'],
-                    primary_exchange=details['primary_exchange'],
-                    local_symbol=details['local_symbol'],
-                    trading_class=details['trading_class'],
-                    min_tick=details['min_tick'],
-                    market_rule_ids=details['market_rule_ids'],
-                    contract_month=details['contract_month'],
-                    last_trading_day=details['last_trading_day'],
-                    time_zone_id=details['time_zone_id'],
-                    updated_at=datetime.now()
-                )
-                
-                # Use UPSERT to handle duplicates
-                stmt = insert(ContractDetail).values(
-                    symbol=details['symbol'],
-                    con_id=details['con_id'],
-                    sec_type=details['sec_type'],
-                    currency=details['currency'],
-                    exchange=details['exchange'],
-                    primary_exchange=details['primary_exchange'],
-                    local_symbol=details['local_symbol'],
-                    trading_class=details['trading_class'],
-                    min_tick=details['min_tick'],
-                    market_rule_ids=details['market_rule_ids'],
-                    contract_month=details['contract_month'],
-                    last_trading_day=details['last_trading_day'],
-                    time_zone_id=details['time_zone_id'],
-                    updated_at=datetime.now()
-                )
-                
-                # Update on conflict (if con_id already exists)
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=['con_id'],
-                    set_={
-                        'symbol': stmt.excluded.symbol,
-                        'sec_type': stmt.excluded.sec_type,
-                        'currency': stmt.excluded.currency,
-                        'exchange': stmt.excluded.exchange,
-                        'primary_exchange': stmt.excluded.primary_exchange,
-                        'local_symbol': stmt.excluded.local_symbol,
-                        'trading_class': stmt.excluded.trading_class,
-                        'min_tick': stmt.excluded.min_tick,
-                        'market_rule_ids': stmt.excluded.market_rule_ids,
-                        'contract_month': stmt.excluded.contract_month,
-                        'last_trading_day': stmt.excluded.last_trading_day,
-                        'time_zone_id': stmt.excluded.time_zone_id,
-                        'updated_at': stmt.excluded.updated_at
-                    }
-                )
-                
-                await db_session.execute(stmt)
-                await db_session.commit()
-                
-                logger.debug("Contract details stored in database", 
-                           symbol=symbol, con_id=details['con_id'])
-                return True
-                
-            except Exception as e:
-                await db_session.rollback()
-                logger.error("Error storing contract details", 
-                           symbol=symbol, error=str(e))
-                return False
-
-
-async def populate_liquid_stocks(force_refresh: bool = False):
-    """Populate contract details for most liquid ASX stocks"""
-    print("🚀 Populating Contract Details for Liquid ASX Stocks")
-    print("=" * 60)
-    
-    collector = ContractDetailsCollector()
-    
-    # Start with top 20 liquid stocks for testing
-    liquid_symbols = get_liquid_stocks(20)
-    
-    print(f"📊 Processing {len(liquid_symbols)} liquid stocks:")
-    print(f"   Symbols: {', '.join(liquid_symbols)}")
-    print(f"   Force refresh: {force_refresh}")
-    print()
-    
-    result = await collector.populate_contract_details(liquid_symbols, force_refresh)
-    
-    if result['success']:
-        print("✅ Contract details collection completed successfully!")
-        print(f"   📈 Successful: {len(result['successful_symbols'])}")
-        print(f"   ❌ Failed: {len(result['failed_symbols'])}")
-        print(f"   📦 Already cached: {result['already_cached']}")
-        print(f"   🎯 Success rate: {result['success_rate']:.1f}%")
-        
-        if result['successful_symbols']:
-            print(f"\n✅ Successfully processed symbols:")
-            for symbol in result['successful_symbols']:
-                print(f"   - {symbol}")
-        
-        if result['failed_symbols']:
-            print(f"\n❌ Failed symbols:")
-            for symbol in result['failed_symbols']:
-                print(f"   - {symbol}")
-        
-        return True
-    else:
-        print(f"❌ Contract details collection failed: {result.get('error', 'Unknown error')}")
-        return False
-
-
-async def populate_all_asx200(force_refresh: bool = False):
-    """Populate contract details for all ASX200 stocks"""
-    print("🚀 Populating Contract Details for All ASX200 Stocks")
-    print("=" * 60)
-    
-    collector = ContractDetailsCollector()
-    
-    # Get all ASX200 symbols
-    all_symbols = get_asx200_symbols()
-    
-    print(f"📊 Processing {len(all_symbols)} ASX200 stocks")
-    print(f"   Force refresh: {force_refresh}")
-    print("   ⚠️  This will take approximately {:.1f} minutes with rate limiting".format(len(all_symbols) * 2 / 60))
-    print()
-    
-    # Confirm before proceeding
-    confirm = input("Do you want to continue? (y/N): ").strip().lower()
-    if confirm != 'y':
-        print("Operation cancelled.")
-        return False
-    
-    result = await collector.populate_contract_details(all_symbols, force_refresh)
-    
-    if result['success']:
-        print("✅ Contract details collection completed successfully!")
-        print(f"   📈 Successful: {len(result['successful_symbols'])}")
-        print(f"   ❌ Failed: {len(result['failed_symbols'])}")
-        print(f"   📦 Already cached: {result['already_cached']}")
-        print(f"   🎯 Success rate: {result['success_rate']:.1f}%")
-        
-        return True
-    else:
-        print(f"❌ Contract details collection failed: {result.get('error', 'Unknown error')}")
-        return False
-
-
-async def verify_contract_details():
-    """Verify stored contract details"""
-    print("🔍 Verifying Contract Details in Database")
-    print("=" * 60)
-    
-    async with AsyncSessionLocal() as db_session:
+    async def insert_contract_to_db(self, contract_data: Dict) -> bool:
+        """Insert validated contract data into database."""
         try:
-            from sqlalchemy import select, func
-            
-            # Get contract details count
-            result = await db_session.execute(
-                select(func.count(ContractDetail.id))
+            contract_detail = ContractDetail(
+                symbol=contract_data["symbol"],
+                con_id=contract_data["con_id"],
+                sec_type=contract_data["sec_type"],
+                currency=contract_data["currency"],
+                exchange=contract_data["exchange"],
+                primary_exchange=contract_data.get("primary_exchange"),
+                local_symbol=contract_data.get("local_symbol"),
+                trading_class=contract_data.get("trading_class"),
+                
+                long_name=contract_data.get("long_name"),
+                market_name=contract_data.get("market_name"),
+                
+                industry=contract_data.get("industry"),
+                category=contract_data.get("category"),
+                subcategory=contract_data.get("subcategory"),
+                
+                min_tick=contract_data.get("min_tick"),
+                price_magnifier=contract_data.get("price_magnifier"),
+                md_size_multiplier=contract_data.get("md_size_multiplier"),
+                
+                market_rule_ids=contract_data.get("market_rule_ids"),
+                order_types=contract_data.get("order_types"),
+                valid_exchanges=contract_data.get("valid_exchanges"),
+                
+                trading_hours=contract_data.get("trading_hours"),
+                liquid_hours=contract_data.get("liquid_hours"),
+                time_zone_id=contract_data.get("time_zone_id"),
+                
+                sec_id_list=contract_data.get("sec_id_list"),
+                stock_type=contract_data.get("stock_type"),
+                cusip=contract_data.get("cusip"),
+                
+                contract_month=contract_data.get("contract_month"),
+                last_trading_day=contract_data.get("last_trading_day"),
+                real_expiration_date=contract_data.get("real_expiration_date"),
+                last_trade_time=contract_data.get("last_trade_time"),
+                
+                bond_type=contract_data.get("bond_type"),
+                coupon_type=contract_data.get("coupon_type"),
+                coupon=contract_data.get("coupon"),
+                callable=contract_data.get("callable", False),
+                putable=contract_data.get("putable", False),
+                convertible=contract_data.get("convertible", False),
+                maturity=contract_data.get("maturity"),
+                issue_date=contract_data.get("issue_date"),
+                ratings=contract_data.get("ratings"),
+                
+                next_option_date=contract_data.get("next_option_date"),
+                next_option_type=contract_data.get("next_option_type"),
+                next_option_partial=contract_data.get("next_option_partial", False),
+                
+                under_con_id=contract_data.get("under_con_id"),
+                under_symbol=contract_data.get("under_symbol"),
+                under_sec_type=contract_data.get("under_sec_type"),
+                
+                agg_group=contract_data.get("agg_group"),
+                ev_rule=contract_data.get("ev_rule"),
+                ev_multiplier=contract_data.get("ev_multiplier"),
+                desc_append=contract_data.get("desc_append"),
+                notes=contract_data.get("notes")
             )
-            total_contracts = result.scalar()
             
-            print(f"📊 Total contract details in database: {total_contracts}")
+            self.session.add(contract_detail)
+            await self.session.commit()
+            logger.debug(f"Inserted {contract_data['symbol']} into database")
+            return True
             
-            if total_contracts > 0:
-                # Get sample contract details
-                result = await db_session.execute(
-                    select(ContractDetail).limit(5)
-                )
-                sample_contracts = result.scalars().all()
-                
-                print("\n📋 Sample contract details:")
-                for contract in sample_contracts:
-                    print(f"   {contract.symbol}: ConID={contract.con_id}, Exchange={contract.exchange}")
-                
-                # Get symbols with contract details
-                result = await db_session.execute(
-                    select(ContractDetail.symbol).order_by(ContractDetail.symbol)
-                )
-                symbols_with_contracts = [row[0] for row in result]
-                
-                print(f"\n✅ Symbols with contract details ({len(symbols_with_contracts)}):")
-                for i, symbol in enumerate(symbols_with_contracts):
-                    if i % 10 == 0 and i > 0:
-                        print()
-                    print(f"{symbol:4}", end=" ")
-                print("\n")
-                
-                return symbols_with_contracts
+        except IntegrityError as e:
+            await self.session.rollback()
+            if "duplicate key" in str(e).lower() or "unique constraint" in str(e).lower():
+                logger.debug(f"{contract_data['symbol']} already exists in database")
             else:
-                print("❌ No contract details found in database")
-                return []
-                
+                logger.error(f"Database integrity error for {contract_data['symbol']}: {e}")
+            return False
+            
         except Exception as e:
-            logger.error("Error verifying contract details", error=str(e))
-            print(f"❌ Error verifying contract details: {str(e)}")
-            return []
-
-
-def main():
-    """Main function"""
-    load_dotenv()
+            await self.session.rollback()
+            logger.error(f"Database error for {contract_data['symbol']}: {e}")
+            return False
     
-    print("📈 ASX200 Contract Details Population Tool")
-    print("=" * 60)
-    print()
-    print("Options:")
-    print("1. Populate liquid stocks (20 stocks, ~1 minute)")
-    print("2. Populate all ASX200 (50 stocks, ~2 minutes)")  
-    print("3. Verify existing contract details")
-    print("4. Force refresh liquid stocks")
-    print()
-    
-    try:
-        choice = input("Select option (1-4): ").strip()
+    async def process_contracts(self, keep_invalid: bool = False):
+        """Main processing logic - load, validate, and update contracts."""
+        self.existing_symbols = await self.get_existing_symbols()
+        json_contracts = self.load_contracts_from_json()
         
-        if choice == "1":
-            success = asyncio.run(populate_liquid_stocks(force_refresh=False))
-        elif choice == "2":
-            success = asyncio.run(populate_all_asx200(force_refresh=False))
-        elif choice == "3":
-            symbols = asyncio.run(verify_contract_details())
-            success = len(symbols) > 0
-        elif choice == "4":
-            success = asyncio.run(populate_liquid_stocks(force_refresh=True))
-        else:
-            print("Invalid option selected.")
+        if not json_contracts:
+            logger.error("No contracts found in JSON file")
             return
         
-        if success:
-            print("\n🎉 Operation completed successfully!")
-            print("\nNext steps:")
-            print("1. Test data collection: python scripts/test_data_collection.py")
-            print("2. Test backfill: POST /api/data/backfill/BHP")
-            print("3. Validate data: POST /api/data/validate/BHP")
-        else:
-            print("\n⚠️  Operation completed with issues. Check logs for details.")
+        logger.info(f"Processing {len(json_contracts)} contracts ({len(self.existing_symbols)} already in database)")
+        
+        updated_contracts = []
+        new_contracts_added = 0
+        
+        for i, contract_data in enumerate(json_contracts, 1):
+            symbol = contract_data.get("symbol")
+            logger.debug(f"[{i}/{len(json_contracts)}] Processing {symbol}")
+            
+            if symbol in self.existing_symbols:
+                logger.debug(f"Skipping {symbol} - already exists in database")
+                updated_contracts.append(contract_data)
+                continue
+            
+            validated_contract = await self.validate_contract_with_ibkr(contract_data)
+            
+            if validated_contract:
+                success = await self.insert_contract_to_db(validated_contract)
+                if success:
+                    logger.info(f"Added {symbol} (ConID: {validated_contract['con_id']})")
+                    new_contracts_added += 1
+                updated_contracts.append(contract_data)
+            else:
+                if keep_invalid:
+                    logger.debug(f"Keeping invalid contract {symbol} in JSON file (--keep-invalid flag set)")
+                    updated_contracts.append(contract_data)
+                else:
+                    logger.warning(f"Removing invalid contract {symbol} from JSON file")
+            
+            await asyncio.sleep(2)
+        
+        self.save_contracts_to_json(updated_contracts)
+        
+        total_processed = len(json_contracts)
+        existing_skipped = len(json_contracts) - len(self.valid_contracts) - len(self.invalid_contracts)
+        
+        logger.info(f"Complete: {new_contracts_added} new contracts added, {existing_skipped} skipped (already exist)")
+        
+        if self.invalid_contracts:
+            if keep_invalid:
+                logger.info(f"Kept {len(self.invalid_contracts)} invalid contracts in JSON file")
+            else:
+                logger.warning(f"Removed {len(self.invalid_contracts)} invalid contracts: {', '.join(self.invalid_contracts)}")
+
+
+async def main():
+    """Main execution function."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Populate contract details from JSON file')
+    parser.add_argument('--json-file', type=str, default='app/data/seeds/contracts.json',
+                       help='JSON file containing contract data (default: app/data/seeds/contracts.json)')
+    parser.add_argument('--live-trading', action='store_true',
+                       help='Override settings to use live trading port instead of paper trading')
+    parser.add_argument('--keep-invalid', action='store_true',
+                       help='Keep invalid contracts in JSON file instead of removing them')
+    args = parser.parse_args()
+    
+    # Override to live trading if requested
+    original_paper_trading = settings.ibkr_paper_trading
+    if args.live_trading:
+        settings.ibkr_paper_trading = False
+        logger.info(f"Overriding to live trading (port {settings.ibkr_live_port})")
+    else:
+        port = settings.ibkr_paper_port if settings.ibkr_paper_trading else settings.ibkr_live_port
+        mode = "paper trading" if settings.ibkr_paper_trading else "live trading"
+        logger.info(f"Using {mode} connection (port {port})")
+    
+    try:
+        updater = ContractUpdater(json_file=args.json_file)
+        
+        async with updater:
+            await updater.process_contracts(keep_invalid=args.keep_invalid)
             
     except KeyboardInterrupt:
-        print("\n\n🛑 Operation cancelled by user")
+        logger.info("❌ Process interrupted by user")
+        sys.exit(1)
+    except ConnectionError as e:
+        logger.error(f"❌ Connection error: {e}")
+        logger.error("Please ensure TWS is running and API is enabled")
+        sys.exit(1)
     except Exception as e:
-        print(f"\n💥 Unexpected error: {e}")
+        logger.error(f"❌ Process failed: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

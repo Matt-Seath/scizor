@@ -107,10 +107,12 @@ class RateLimit(Base):
 
 
 class ContractDetail(Base):
-    """IBKR contract details cache"""
+    """IBKR contract details cache with comprehensive IBKR API data"""
     __tablename__ = "contract_details"
     
     id = Column(Integer, primary_key=True, index=True)
+    
+    # Core contract identification
     symbol = Column(String(10), nullable=False)
     con_id = Column(BIGINT, nullable=False, unique=True)
     sec_type = Column(String(10), nullable=False)  # STK, OPT, FUT, etc.
@@ -119,16 +121,83 @@ class ContractDetail(Base):
     primary_exchange = Column(String(20))
     local_symbol = Column(String(20))
     trading_class = Column(String(20))
-    min_tick = Column(DECIMAL(10, 8))
+    
+    # Company information
+    long_name = Column(String(200))  # Full company name from IBKR
+    market_name = Column(String(50))  # Market display name
+    
+    # Industry classification
+    industry = Column(String(100))  # e.g., "Basic Materials", "Financial"
+    category = Column(String(100))  # e.g., "Mining", "Banks"
+    subcategory = Column(String(100))  # e.g., "Diversified Minerals", "Commercial Banks Non-US"
+    
+    # Trading specifications
+    min_tick = Column(DECIMAL(10, 8))  # Minimum price increment
+    price_magnifier = Column(Integer, default=1)  # Price magnifier for display
+    md_size_multiplier = Column(Integer, default=1)  # Market data size multiplier
+    
+    # Market rules and trading
     market_rule_ids = Column(Text)  # JSON array of market rule IDs
-    contract_month = Column(String(10))
-    last_trading_day = Column(Date)
-    time_zone_id = Column(String(50))
+    order_types = Column(Text)  # Supported order types (comma-separated)
+    valid_exchanges = Column(Text)  # Valid exchanges for routing (comma-separated)
+    
+    # Trading hours (IBKR format: YYYYMMDD:HHMM-YYYYMMDD:HHMM;...)
+    trading_hours = Column(Text)  # Regular trading hours schedule
+    liquid_hours = Column(Text)  # Liquid trading hours schedule
+    time_zone_id = Column(String(50))  # Exchange timezone
+    
+    # Security identifiers
+    sec_id_list = Column(Text)  # JSON array of security IDs (ISIN, CUSIP, etc.)
+    stock_type = Column(String(20))  # COMMON, PREFERRED, etc.
+    cusip = Column(String(20))  # CUSIP identifier
+    
+    # Contract specifications (futures/options)
+    contract_month = Column(String(10))  # Contract month for derivatives
+    last_trading_day = Column(Date)  # Last trading day
+    real_expiration_date = Column(String(10))  # Real expiration date
+    last_trade_time = Column(String(20))  # Last trade time
+    
+    # Bond/Fixed Income fields
+    bond_type = Column(String(50))  # Bond type classification
+    coupon_type = Column(String(50))  # Coupon type
+    coupon = Column(DECIMAL(10, 4))  # Coupon rate
+    callable = Column(Boolean, default=False)  # Callable bond flag
+    putable = Column(Boolean, default=False)  # Putable bond flag
+    convertible = Column(Boolean, default=False)  # Convertible security flag
+    maturity = Column(String(20))  # Maturity date
+    issue_date = Column(String(20))  # Issue date
+    ratings = Column(String(100))  # Credit ratings
+    
+    # Options fields
+    next_option_date = Column(String(20))  # Next option date
+    next_option_type = Column(String(20))  # Next option type
+    next_option_partial = Column(Boolean, default=False)  # Partial option flag
+    
+    # Underlying contract (for derivatives)
+    under_con_id = Column(BIGINT)  # Underlying contract ID
+    under_symbol = Column(String(20))  # Underlying symbol
+    under_sec_type = Column(String(10))  # Underlying security type
+    
+    # Additional metadata
+    agg_group = Column(Integer)  # Aggregation group
+    ev_rule = Column(Text)  # Economic value rule
+    ev_multiplier = Column(DECIMAL(10, 4))  # Economic value multiplier
+    desc_append = Column(Text)  # Description appendix
+    notes = Column(Text)  # Additional notes
+    
+    # System fields
+    created_at = Column(DateTime, default=func.current_timestamp())
     updated_at = Column(DateTime, default=func.current_timestamp())
     
     __table_args__ = (
         Index('idx_contracts_symbol_exchange', 'symbol', 'exchange'),
+        Index('idx_contracts_long_name', 'long_name'),
+        Index('idx_contracts_industry_category', 'industry', 'category'),
+        Index('idx_contracts_stock_type', 'stock_type'),
+        Index('idx_contracts_trading_hours', 'time_zone_id'),
         Index('idx_contracts_updated_at', 'updated_at'),
+        Index('idx_contracts_under_con_id', 'under_con_id'),
+        Index('idx_contracts_sec_type_currency', 'sec_type', 'currency'),
     )
 
 

@@ -129,6 +129,7 @@ backtest_results/
 data/raw/
 data/processed/
 models/trained/
+examples/
 
 # IBKR API logs
 api_*.log

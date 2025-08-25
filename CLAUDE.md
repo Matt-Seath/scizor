@@ -319,9 +319,11 @@ CREATE TABLE rate_limits (
     INDEX idx_window_end (window_end)
 );
 
--- IBKR contract details cache
+-- IBKR contract details cache with comprehensive IBKR API data
 CREATE TABLE contract_details (
     id SERIAL PRIMARY KEY,
+    
+    -- Core contract identification
     symbol VARCHAR(10) NOT NULL,
     con_id BIGINT NOT NULL,
     sec_type VARCHAR(10) NOT NULL, -- STK, OPT, FUT, etc.
@@ -330,15 +332,84 @@ CREATE TABLE contract_details (
     primary_exchange VARCHAR(20),
     local_symbol VARCHAR(20),
     trading_class VARCHAR(20),
-    min_tick DECIMAL(10,8),
+    
+    -- Company information
+    long_name VARCHAR(200), -- Full company name from IBKR
+    market_name VARCHAR(50), -- Market display name
+    
+    -- Industry classification
+    industry VARCHAR(100), -- e.g., "Basic Materials", "Financial"
+    category VARCHAR(100), -- e.g., "Mining", "Banks"
+    subcategory VARCHAR(100), -- e.g., "Diversified Minerals", "Commercial Banks Non-US"
+    
+    -- Trading specifications
+    min_tick DECIMAL(10,8), -- Minimum price increment
+    price_magnifier INTEGER DEFAULT 1, -- Price magnifier for display
+    md_size_multiplier INTEGER DEFAULT 1, -- Market data size multiplier
+    
+    -- Market rules and trading
     market_rule_ids TEXT, -- JSON array of market rule IDs
-    contract_month VARCHAR(10),
-    last_trading_day DATE,
-    time_zone_id VARCHAR(50),
+    order_types TEXT, -- Supported order types (comma-separated)
+    valid_exchanges TEXT, -- Valid exchanges for routing (comma-separated)
+    
+    -- Trading hours (IBKR format: YYYYMMDD:HHMM-YYYYMMDD:HHMM;...)
+    trading_hours TEXT, -- Regular trading hours schedule
+    liquid_hours TEXT, -- Liquid trading hours schedule
+    time_zone_id VARCHAR(50), -- Exchange timezone
+    
+    -- Security identifiers
+    sec_id_list TEXT, -- JSON array of security IDs (ISIN, CUSIP, etc.)
+    stock_type VARCHAR(20), -- COMMON, PREFERRED, etc.
+    cusip VARCHAR(20), -- CUSIP identifier
+    
+    -- Contract specifications (futures/options)
+    contract_month VARCHAR(10), -- Contract month for derivatives
+    last_trading_day DATE, -- Last trading day
+    real_expiration_date VARCHAR(10), -- Real expiration date
+    last_trade_time VARCHAR(20), -- Last trade time
+    
+    -- Bond/Fixed Income fields
+    bond_type VARCHAR(50), -- Bond type classification
+    coupon_type VARCHAR(50), -- Coupon type
+    coupon DECIMAL(10,4), -- Coupon rate
+    callable BOOLEAN DEFAULT FALSE, -- Callable bond flag
+    putable BOOLEAN DEFAULT FALSE, -- Putable bond flag
+    convertible BOOLEAN DEFAULT FALSE, -- Convertible security flag
+    maturity VARCHAR(20), -- Maturity date
+    issue_date VARCHAR(20), -- Issue date
+    ratings VARCHAR(100), -- Credit ratings
+    
+    -- Options fields
+    next_option_date VARCHAR(20), -- Next option date
+    next_option_type VARCHAR(20), -- Next option type
+    next_option_partial BOOLEAN DEFAULT FALSE, -- Partial option flag
+    
+    -- Underlying contract (for derivatives)
+    under_con_id BIGINT, -- Underlying contract ID
+    under_symbol VARCHAR(20), -- Underlying symbol
+    under_sec_type VARCHAR(10), -- Underlying security type
+    
+    -- Additional metadata
+    agg_group INTEGER, -- Aggregation group
+    ev_rule TEXT, -- Economic value rule
+    ev_multiplier DECIMAL(10,4), -- Economic value multiplier
+    desc_append TEXT, -- Description appendix
+    notes TEXT, -- Additional notes
+    
+    -- System fields
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints and indexes
     UNIQUE(con_id),
     INDEX idx_symbol_exchange (symbol, exchange),
-    INDEX idx_updated_at (updated_at)
+    INDEX idx_long_name (long_name),
+    INDEX idx_industry_category (industry, category),
+    INDEX idx_stock_type (stock_type),
+    INDEX idx_trading_hours (time_zone_id),
+    INDEX idx_updated_at (updated_at),
+    INDEX idx_under_con_id (under_con_id),
+    INDEX idx_sec_type_currency (sec_type, currency)
 );
 
 -- Market data subscriptions tracking

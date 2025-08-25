@@ -1,0 +1,611 @@
+[
+  {
+    "symbol": "CBA",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "BHP",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "CSL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "NAB",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ANZ",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WBC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WES",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "RIO",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "MQG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WOW",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "FMG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ALL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "COL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "TLS",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WDS",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "STO",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "QBE",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "REA",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "XRO",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "RMD",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "COH",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "IAG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "SUN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ASX",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "SOL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "MIN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "JHX",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WTC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "CPU",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "TPG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "GMG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ALD",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "SCG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "PME",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "AMP",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "EVN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "AGL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ORI",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "JBH",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "APA",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "URW",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "LTR",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "IGO",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ORG",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "CHC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "LLC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "NXT",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "VCX",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "S32",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "DXS",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "AZJ",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "EDV",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "BOQ",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "CAR",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ALX",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "HVN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "COD",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ZIP",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "LYC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "BEN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "IFL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "SGP",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ILU",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "NST",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "DMP",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "TWE",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "DRR",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "PLS",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "RHC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "APE",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "SHL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WPR",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "NAN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WHC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "CHR",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "WOR",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "NEC",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "PNI",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "IEL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "TNE",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "SEK",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "CTD",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "RRL",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ING",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "BXB",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "LOV",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  },
+  {
+    "symbol": "ANN",
+    "sec_type": "STK",
+    "currency": "AUD",
+    "exchange": "ASX",
+    "primary_exchange": "ASX"
+  }
+]
