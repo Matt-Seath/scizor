@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, and_, case
 from celery import current_task
 
 from app.tasks.celery_app import celery_app
@@ -206,47 +206,81 @@ async def _check_api_health(db_session: AsyncSession, report: Dict[str, Any]):
 
 
 async def _check_connection_state(db_session: AsyncSession, report: Dict[str, Any]):
-    """Check IBKR connection state"""
+    """Check IBKR connection state with enhanced monitoring"""
     try:
-        # Get latest connection state
+        # Get all connection states (multiple clients possible)
         result = await db_session.execute(
             select(ConnectionState)
             .order_by(desc(ConnectionState.last_heartbeat))
-            .limit(1)
         )
         
-        latest_connection = result.scalar_one_or_none()
+        connections = result.scalars().all()
         
-        if latest_connection:
-            time_since_heartbeat = datetime.now() - latest_connection.last_heartbeat
+        if connections:
+            connection_details = []
+            overall_status = "healthy"
+            
+            for conn in connections:
+                if conn.last_heartbeat:
+                    time_since_heartbeat = datetime.now() - conn.last_heartbeat
+                    minutes_since_heartbeat = round(time_since_heartbeat.total_seconds() / 60, 1)
+                else:
+                    time_since_heartbeat = None
+                    minutes_since_heartbeat = None
+                
+                conn_detail = {
+                    'client_id': conn.client_id,
+                    'status': conn.status,
+                    'last_heartbeat': conn.last_heartbeat.isoformat() if conn.last_heartbeat else None,
+                    'minutes_since_heartbeat': minutes_since_heartbeat,
+                    'error_count': conn.error_count,
+                    'last_error_code': conn.last_error_code,
+                    'last_error_message': conn.last_error_message,
+                    'connection_started_at': conn.connection_started_at.isoformat() if conn.connection_started_at else None,
+                    'last_data_received_at': conn.last_data_received_at.isoformat() if conn.last_data_received_at else None
+                }
+                
+                # Check individual connection health
+                if conn.status != 'CONNECTED':
+                    overall_status = "warning"
+                    report['warnings'].append(f"Client {conn.client_id}: Connection status {conn.status}")
+                
+                if time_since_heartbeat and time_since_heartbeat.total_seconds() > 300:  # > 5 minutes
+                    overall_status = "critical"
+                    report['critical_issues'].append(f"Client {conn.client_id}: Heartbeat stale ({minutes_since_heartbeat} min)")
+                
+                if conn.error_count > 100:  # High error threshold
+                    overall_status = "warning" if overall_status == "healthy" else overall_status
+                    report['warnings'].append(f"Client {conn.client_id}: High error count ({conn.error_count})")
+                
+                # Check data staleness
+                if conn.last_data_received_at:
+                    time_since_data = datetime.now() - conn.last_data_received_at
+                    if time_since_data.total_seconds() > 1800:  # 30 minutes
+                        report['warnings'].append(f"Client {conn.client_id}: No data received for {time_since_data.total_seconds() // 60:.0f} min")
+                        conn_detail['data_stale'] = True
+                
+                connection_details.append(conn_detail)
             
             report['checks']['connection_state'] = {
-                'status': latest_connection.status,
-                'client_id': latest_connection.client_id,
-                'last_heartbeat': latest_connection.last_heartbeat.isoformat(),
-                'minutes_since_heartbeat': round(time_since_heartbeat.total_seconds() / 60, 1),
-                'error_count': latest_connection.error_count
+                'status': overall_status,
+                'total_clients': len(connections),
+                'connections': connection_details
             }
-            
-            if latest_connection.status != 'CONNECTED':
-                report['warnings'].append(f"IBKR connection status: {latest_connection.status}")
-            
-            if time_since_heartbeat.total_seconds() > 300:  # > 5 minutes
-                report['critical_issues'].append("IBKR connection heartbeat is stale")
                 
         else:
             report['checks']['connection_state'] = {
                 'status': 'unknown',
                 'message': 'No connection state records found'
             }
-            report['warnings'].append("No IBKR connection state available")
+            report['critical_issues'].append("No IBKR connection state available - system may not be running")
             
     except Exception as e:
         report['checks']['connection_state'] = {
             'status': 'error',
             'error': str(e)
         }
-        report['warnings'].append(f"Connection state check failed: {str(e)}")
+        report['critical_issues'].append(f"Connection state check failed: {str(e)}")
 
 
 async def _check_portfolio_health(db_session: AsyncSession, report: Dict[str, Any]):
@@ -408,3 +442,279 @@ def alert_critical_issues(self, issues: List[str]):
         'alerts_sent': len(issues),
         'issues': issues
     }
+
+
+@celery_app.task(bind=True, name='app.tasks.monitoring.connection_recovery_check')
+def connection_recovery_check(self):
+    """
+    Monitor connection state and trigger recovery actions
+    Runs every 2 minutes to check for connection issues
+    """
+    task_id = self.request.id
+    logger.info("Starting connection recovery check", task_id=task_id)
+    
+    try:
+        result = asyncio.run(_async_connection_recovery_check(task_id))
+        
+        if result.get('recovery_actions'):
+            logger.warning("Connection recovery actions taken",
+                          actions=result['recovery_actions'],
+                          task_id=task_id)
+        
+        return result
+        
+    except Exception as e:
+        logger.error("Connection recovery check failed", error=str(e), task_id=task_id)
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+async def _async_connection_recovery_check(task_id: str) -> Dict[str, Any]:
+    """Async connection recovery check"""
+    recovery_report = {
+        'status': 'completed',
+        'timestamp': datetime.now().isoformat(),
+        'task_id': task_id,
+        'connections_checked': 0,
+        'recovery_actions': [],
+        'warnings': []
+    }
+    
+    async with AsyncSessionLocal() as db_session:
+        try:
+            # Get all connection states
+            result = await db_session.execute(
+                select(ConnectionState)
+                .order_by(ConnectionState.client_id)
+            )
+            
+            connections = result.scalars().all()
+            recovery_report['connections_checked'] = len(connections)
+            
+            current_time = datetime.now()
+            
+            for conn in connections:
+                client_actions = []
+                client_id = conn.client_id
+                
+                # Check for stale heartbeat (connection appears hung)
+                if conn.last_heartbeat:
+                    time_since_heartbeat = current_time - conn.last_heartbeat
+                    if time_since_heartbeat.total_seconds() > 600:  # 10 minutes
+                        client_actions.append("heartbeat_stale")
+                        logger.warning(f"Client {client_id}: Heartbeat stale for {time_since_heartbeat}")
+                
+                # Check for disconnected state lasting too long
+                if conn.status in ['DISCONNECTED', 'ERROR', 'RECONNECTING']:
+                    if conn.last_heartbeat:
+                        time_in_bad_state = current_time - conn.last_heartbeat
+                        if time_in_bad_state.total_seconds() > 300:  # 5 minutes
+                            client_actions.append("extended_disconnection")
+                            logger.warning(f"Client {client_id}: Disconnected for {time_in_bad_state}")
+                
+                # Check for excessive error count
+                if conn.error_count > 200:
+                    client_actions.append("excessive_errors")
+                    logger.warning(f"Client {client_id}: Excessive errors ({conn.error_count})")
+                
+                # Check for data staleness
+                if conn.last_data_received_at:
+                    time_since_data = current_time - conn.last_data_received_at
+                    if time_since_data.total_seconds() > 3600:  # 1 hour
+                        client_actions.append("data_stale")
+                        logger.warning(f"Client {client_id}: No data received for {time_since_data}")
+                
+                # Record recovery actions needed
+                if client_actions:
+                    recovery_report['recovery_actions'].append({
+                        'client_id': client_id,
+                        'actions_needed': client_actions,
+                        'status': conn.status,
+                        'error_count': conn.error_count
+                    })
+                    
+                    # For now, just log the issues. In the future, this could trigger
+                    # actual recovery actions like restarting connections
+                    recovery_report['warnings'].append(
+                        f"Client {client_id} needs recovery: {', '.join(client_actions)}"
+                    )
+            
+            # If we have critical connection issues, we could trigger alerts
+            critical_clients = [
+                action for action in recovery_report['recovery_actions']
+                if 'heartbeat_stale' in action['actions_needed'] or 
+                   'extended_disconnection' in action['actions_needed']
+            ]
+            
+            if critical_clients:
+                # This could trigger an alert task
+                logger.critical(f"Critical connection issues detected for {len(critical_clients)} clients")
+                
+        except Exception as e:
+            recovery_report['status'] = 'error'
+            recovery_report['error'] = str(e)
+            logger.error(f"Connection recovery check error: {str(e)}")
+    
+    return recovery_report
+
+
+@celery_app.task(bind=True, name='app.tasks.monitoring.api_error_analysis')
+def api_error_analysis(self):
+    """
+    Analyze API error patterns and rates
+    Runs every hour to identify trends and issues
+    """
+    task_id = self.request.id
+    logger.info("Starting API error analysis", task_id=task_id)
+    
+    try:
+        result = asyncio.run(_async_api_error_analysis(task_id))
+        
+        if result.get('critical_patterns'):
+            logger.error("Critical API error patterns detected",
+                        patterns=result['critical_patterns'],
+                        task_id=task_id)
+        
+        return result
+        
+    except Exception as e:
+        logger.error("API error analysis failed", error=str(e), task_id=task_id)
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+async def _async_api_error_analysis(task_id: str) -> Dict[str, Any]:
+    """Async API error analysis"""
+    analysis_report = {
+        'status': 'completed',
+        'timestamp': datetime.now().isoformat(),
+        'task_id': task_id,
+        'analysis_period_hours': 24,
+        'error_patterns': {},
+        'critical_patterns': [],
+        'recommendations': []
+    }
+    
+    async with AsyncSessionLocal() as db_session:
+        try:
+            # Analyze last 24 hours of API requests
+            since_time = datetime.now() - timedelta(hours=24)
+            
+            # Get error breakdown by error code
+            result = await db_session.execute(
+                select(
+                    ApiRequest.error_code,
+                    ApiRequest.request_type,
+                    func.count(ApiRequest.id).label('count'),
+                    func.max(ApiRequest.timestamp).label('last_occurrence')
+                )
+                .where(and_(
+                    ApiRequest.timestamp >= since_time,
+                    ApiRequest.error_code.isnot(None)
+                ))
+                .group_by(ApiRequest.error_code, ApiRequest.request_type)
+                .order_by(func.count(ApiRequest.id).desc())
+            )
+            
+            error_patterns = {}
+            total_errors = 0
+            
+            for error_code, request_type, count, last_occurrence in result:
+                total_errors += count
+                
+                if error_code not in error_patterns:
+                    error_patterns[error_code] = {
+                        'total_count': 0,
+                        'request_types': {},
+                        'last_occurrence': None
+                    }
+                
+                error_patterns[error_code]['total_count'] += count
+                error_patterns[error_code]['request_types'][request_type] = count
+                error_patterns[error_code]['last_occurrence'] = max(
+                    error_patterns[error_code]['last_occurrence'] or last_occurrence,
+                    last_occurrence
+                ).isoformat()
+            
+            analysis_report['error_patterns'] = error_patterns
+            analysis_report['total_errors'] = total_errors
+            
+            # Identify critical patterns
+            for error_code, pattern in error_patterns.items():
+                count = pattern['total_count']
+                
+                # Rate limit errors (100) - critical if frequent
+                if error_code == 100 and count > 50:
+                    analysis_report['critical_patterns'].append({
+                        'type': 'rate_limit_violation',
+                        'error_code': error_code,
+                        'count': count,
+                        'severity': 'high'
+                    })
+                    analysis_report['recommendations'].append(
+                        "Consider reducing API request rate or implementing better rate limiting"
+                    )
+                
+                # Connection errors (1100, 1300) - critical if any
+                elif error_code in [1100, 1300] and count > 0:
+                    analysis_report['critical_patterns'].append({
+                        'type': 'connection_failure',
+                        'error_code': error_code,
+                        'count': count,
+                        'severity': 'critical'
+                    })
+                    analysis_report['recommendations'].append(
+                        "Investigate TWS connection stability and network issues"
+                    )
+                
+                # Market data subscription errors (354) - warning if frequent
+                elif error_code == 354 and count > 20:
+                    analysis_report['critical_patterns'].append({
+                        'type': 'market_data_subscription',
+                        'error_code': error_code,
+                        'count': count,
+                        'severity': 'medium'
+                    })
+                    analysis_report['recommendations'].append(
+                        "Verify market data subscriptions and permissions"
+                    )
+                
+                # Any error occurring very frequently
+                elif count > 100:
+                    analysis_report['critical_patterns'].append({
+                        'type': 'frequent_error',
+                        'error_code': error_code,
+                        'count': count,
+                        'severity': 'medium'
+                    })
+            
+            # Calculate error rate
+            total_requests_result = await db_session.execute(
+                select(func.count(ApiRequest.id))
+                .where(ApiRequest.timestamp >= since_time)
+            )
+            total_requests = total_requests_result.scalar() or 0
+            
+            if total_requests > 0:
+                error_rate = (total_errors / total_requests) * 100
+                analysis_report['error_rate_percent'] = round(error_rate, 2)
+                
+                if error_rate > 15:  # 15% error rate is concerning
+                    analysis_report['critical_patterns'].append({
+                        'type': 'high_error_rate',
+                        'error_rate': error_rate,
+                        'severity': 'high'
+                    })
+                    analysis_report['recommendations'].append(
+                        f"Overall error rate is high ({error_rate:.1f}%) - investigate system health"
+                    )
+            
+        except Exception as e:
+            analysis_report['status'] = 'error'
+            analysis_report['error'] = str(e)
+    
+    return analysis_report

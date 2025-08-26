@@ -60,6 +60,16 @@ celery_app.conf.beat_schedule = {
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
         'options': {'queue': 'monitoring'}
     },
+    'connection-recovery-check': {
+        'task': 'app.tasks.monitoring.connection_recovery_check',
+        'schedule': crontab(minute='*/2'),  # Every 2 minutes
+        'options': {'queue': 'monitoring'}
+    },
+    'api-error-analysis': {
+        'task': 'app.tasks.monitoring.api_error_analysis',
+        'schedule': crontab(minute=0),  # Every hour
+        'options': {'queue': 'monitoring'}
+    },
     'weekly-performance-report': {
         'task': 'app.tasks.monitoring.generate_weekly_report',
         'schedule': crontab(hour=18, minute=0, day_of_week=5),  # 6 PM Friday

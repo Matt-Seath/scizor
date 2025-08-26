@@ -1,12 +1,18 @@
 import time
 import threading
-from typing import Dict, List, Optional, Callable
+import asyncio
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Callable, Any
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
 from ibapi.order import Order
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, insert, update
 from app.config.settings import settings
+from app.config.database import get_async_session
+from app.data.models.market import ConnectionState, ApiRequest
 
 logger = structlog.get_logger(__name__)
 
@@ -63,11 +69,25 @@ class IBKRClient(EWrapper, EClient):
         self.rate_limiter = RateLimiter(40, 1)  # 40 req/sec (80% of 50)
         self.historical_limiter = RateLimiter(48, 600)  # 48 req/10min (80% of 60)
         
-        # Connection state
+        # Enhanced connection state
         self.is_connected = False
         self.next_valid_order_id = None
         self.connection_retry_count = 0
-        self.max_retries = 3
+        self.max_retries = 5
+        self.connection_started_at = None
+        self.last_heartbeat = None
+        self.last_error_code = None
+        self.last_error_message = None
+        self.error_count = 0
+        self.reconnect_delay = 5  # Initial reconnect delay in seconds
+        self.max_reconnect_delay = 300  # Max 5 minutes between attempts
+        
+        # Health monitoring
+        self.health_check_interval = 30  # seconds
+        self.last_data_received = None
+        self.connection_timeout = 10  # seconds
+        self.health_monitor_thread = None
+        self.stop_health_monitor = False
         
         # Data storage
         self.market_data_callbacks: Dict[int, Callable] = {}
@@ -143,7 +163,20 @@ class IBKRClient(EWrapper, EClient):
         super().nextValidId(orderId)
         self.next_valid_order_id = orderId
         self.is_connected = True
-        logger.info("Connection established", next_order_id=orderId)
+        self.connection_started_at = datetime.now()
+        self.last_heartbeat = datetime.now()
+        self.error_count = 0
+        
+        # Start health monitoring
+        self._start_health_monitoring()
+        
+        logger.info("Connection established", 
+                   next_order_id=orderId,
+                   client_id=self.client_id,
+                   connection_time=self.connection_started_at)
+        
+        # Update database state asynchronously
+        asyncio.create_task(self._update_connection_state("CONNECTED"))
     
     def connectAck(self):
         """Connection acknowledgment"""
@@ -154,34 +187,56 @@ class IBKRClient(EWrapper, EClient):
         """Called when connection is lost"""
         super().connectionClosed()
         self.is_connected = False
-        logger.warning("Connection closed")
+        self.last_heartbeat = None
+        
+        # Stop health monitoring
+        self._stop_health_monitoring()
+        
+        logger.warning("Connection closed", 
+                      client_id=self.client_id,
+                      uptime_seconds=self._get_connection_uptime())
+        
+        # Update database state asynchronously
+        asyncio.create_task(self._update_connection_state("DISCONNECTED"))
     
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str = ""):
-        """Handle API errors"""
+        """Enhanced error handling with recovery strategies"""
         super().error(reqId, errorCode, errorString, advancedOrderRejectJson)
         
-        # Rate limit violations
-        if errorCode == 100:
+        self.last_error_code = errorCode
+        self.last_error_message = errorString
+        self.error_count += 1
+        
+        # Log the API request error asynchronously
+        asyncio.create_task(self._log_api_error(reqId, errorCode, errorString))
+        
+        # Rate limit violations (100, 162)
+        if errorCode in [100, 162]:
             logger.warning("Rate limit exceeded", 
-                          req_id=reqId, error_string=errorString)
-            time.sleep(1)  # Pause briefly
+                          req_id=reqId, error_code=errorCode, 
+                          error_string=errorString)
+            self._handle_rate_limit_error()
         
         # Connection issues
-        elif errorCode in [1100, 1101, 1102]:
-            if errorCode == 1100:
-                self.is_connected = False
-                logger.error("Connection lost", error_code=errorCode)
-            elif errorCode == 1101:
-                logger.warning("Connection restored, data lost", error_code=errorCode)
-                self.is_connected = True
-            elif errorCode == 1102:
-                logger.info("Connection restored, data maintained", error_code=errorCode)
-                self.is_connected = True
+        elif errorCode in [1100, 1101, 1102, 1300, 2103, 2104, 2105, 2106, 2107, 2108, 2110]:
+            self._handle_connection_error(errorCode, errorString)
         
-        # Market data issues
-        elif errorCode in [354, 10089]:
+        # Market data subscription issues
+        elif errorCode in [354, 10089, 10090, 10091, 10167, 10168]:
             logger.warning("Market data subscription issue", 
-                          error_code=errorCode, error_string=errorString)
+                          req_id=reqId, error_code=errorCode, 
+                          error_string=errorString)
+        
+        # Contract/Symbol errors
+        elif errorCode in [200, 201, 321, 322]:
+            logger.error("Contract/symbol error", 
+                        req_id=reqId, error_code=errorCode,
+                        error_string=errorString)
+        
+        # System errors requiring reconnection
+        elif errorCode in [502, 503, 504, 507]:
+            logger.error("System error, may require reconnection", 
+                        error_code=errorCode, error_string=errorString)
         
         # General errors
         else:
@@ -189,21 +244,85 @@ class IBKRClient(EWrapper, EClient):
                         req_id=reqId, error_code=errorCode, 
                         error_string=errorString)
     
+    def _handle_rate_limit_error(self):
+        """Handle rate limit violations"""
+        # Increase delay between requests
+        self.rate_limiter.tokens = 0  # Reset tokens to force waiting
+        time.sleep(2)  # Pause briefly to let rate limit reset
+    
+    def _handle_connection_error(self, error_code: int, error_string: str):
+        """Handle connection-related errors"""
+        if error_code == 1100:  # Connectivity lost
+            self.is_connected = False
+            logger.error("Connection lost", error_code=error_code)
+            asyncio.create_task(self._update_connection_state("DISCONNECTED"))
+            
+        elif error_code == 1101:  # Connection restored, data lost
+            logger.warning("Connection restored but data lost", error_code=error_code)
+            self.is_connected = True
+            self.last_heartbeat = datetime.now()
+            asyncio.create_task(self._update_connection_state("CONNECTED"))
+            
+        elif error_code == 1102:  # Connection restored, data maintained
+            logger.info("Connection fully restored", error_code=error_code)
+            self.is_connected = True
+            self.last_heartbeat = datetime.now()
+            asyncio.create_task(self._update_connection_state("CONNECTED"))
+            
+        elif error_code == 1300:  # TWS socket port reset
+            logger.error("TWS socket port reset", error_string=error_string)
+            self.is_connected = False
+    
+    async def _log_api_error(self, req_id: int, error_code: int, error_string: str):
+        """Log API error to database for monitoring"""
+        try:
+            async with get_async_session() as db:
+                # Determine request type based on req_id and callbacks
+                request_type = "UNKNOWN"
+                if req_id in self.market_data_callbacks:
+                    request_type = "MARKET_DATA"
+                elif req_id in self.historical_data_callbacks:
+                    request_type = "HISTORICAL_DATA"
+                elif req_id in self.contract_details_callbacks:
+                    request_type = "CONTRACT_DETAILS"
+                
+                # Log the API error
+                insert_stmt = insert(ApiRequest).values(
+                    request_type=request_type,
+                    req_id=req_id,
+                    timestamp=datetime.now(),
+                    status="FAILED",
+                    error_code=error_code,
+                    error_message=error_string[:500],  # Limit length
+                    client_id=self.client_id
+                )
+                await db.execute(insert_stmt)
+                await db.commit()
+                
+        except Exception as e:
+            logger.error("Failed to log API error", error=str(e))
+    
     def tickPrice(self, reqId: int, tickType: int, price: float, attrib):
-        """Market data price tick"""
+        """Market data price tick with data reception tracking"""
         super().tickPrice(reqId, tickType, price, attrib)
+        self.last_data_received = datetime.now()
+        
         if reqId in self.market_data_callbacks:
             self.market_data_callbacks[reqId]('price', tickType, price, attrib)
     
     def tickSize(self, reqId: int, tickType: int, size: float):
-        """Market data size tick"""
+        """Market data size tick with data reception tracking"""
         super().tickSize(reqId, tickType, size)
+        self.last_data_received = datetime.now()
+        
         if reqId in self.market_data_callbacks:
             self.market_data_callbacks[reqId]('size', tickType, size, None)
     
     def historicalData(self, reqId: int, bar):
-        """Historical data bar"""
+        """Historical data bar with data reception tracking"""
         super().historicalData(reqId, bar)
+        self.last_data_received = datetime.now()
+        
         if reqId in self.historical_data_callbacks:
             self.historical_data_callbacks[reqId](bar)
     
@@ -216,8 +335,10 @@ class IBKRClient(EWrapper, EClient):
         self.pending_requests.discard(reqId)
     
     def contractDetails(self, reqId: int, contractDetails):
-        """Contract details response"""
+        """Contract details response with data reception tracking"""
         super().contractDetails(reqId, contractDetails)
+        self.last_data_received = datetime.now()
+        
         if reqId in self.contract_details_callbacks:
             self.contract_details_callbacks[reqId](contractDetails)
     
@@ -327,15 +448,174 @@ class IBKRClient(EWrapper, EClient):
         except Exception as e:
             logger.error("Failed to cancel market data", req_id=req_id, error=str(e))
     
-    def get_connection_status(self) -> Dict[str, any]:
-        """Get current connection status"""
+    def get_connection_status(self) -> Dict[str, Any]:
+        """Get comprehensive connection status"""
+        uptime = self._get_connection_uptime()
+        
         return {
             "connected": self.is_connected,
+            "healthy": self._connection_healthy(),
             "host": self.host,
             "port": self.port,
             "client_id": self.client_id,
+            "connection_started_at": self.connection_started_at.isoformat() if self.connection_started_at else None,
+            "uptime_seconds": uptime,
+            "last_heartbeat": self.last_heartbeat.isoformat() if self.last_heartbeat else None,
             "retry_count": self.connection_retry_count,
+            "error_count": self.error_count,
+            "last_error_code": self.last_error_code,
+            "last_error_message": self.last_error_message,
             "pending_requests": len(self.pending_requests),
-            "rate_limiter_tokens": self.rate_limiter.tokens,
-            "historical_limiter_tokens": self.historical_limiter.tokens
+            "active_subscriptions": len(self.market_data_callbacks),
+            "rate_limiter_tokens": round(self.rate_limiter.tokens, 2),
+            "historical_limiter_tokens": round(self.historical_limiter.tokens, 2),
+            "last_data_received": self.last_data_received.isoformat() if self.last_data_received else None
         }
+    
+    def _get_connection_uptime(self) -> Optional[int]:
+        """Get connection uptime in seconds"""
+        if self.connection_started_at and self.is_connected:
+            return int((datetime.now() - self.connection_started_at).total_seconds())
+        return None
+    
+    def _connection_healthy(self) -> bool:
+        """Check if current connection is healthy"""
+        if not self.is_connected:
+            return False
+        
+        # Check for recent heartbeat
+        if self.last_heartbeat:
+            time_since_heartbeat = datetime.now() - self.last_heartbeat
+            if time_since_heartbeat > timedelta(minutes=5):
+                logger.warning("No heartbeat received recently", 
+                             last_heartbeat=self.last_heartbeat)
+                return False
+        
+        return True
+    
+    async def _update_connection_state(self, status: str):
+        """Update connection state in database"""
+        try:
+            async with get_async_session() as db:
+                # Update or insert connection state
+                stmt = select(ConnectionState).where(ConnectionState.client_id == self.client_id)
+                result = await db.execute(stmt)
+                existing = result.scalar_one_or_none()
+                
+                if existing:
+                    # Update existing record
+                    update_stmt = (
+                        update(ConnectionState)
+                        .where(ConnectionState.client_id == self.client_id)
+                        .values(
+                            status=status,
+                            last_heartbeat=datetime.now(),
+                            error_count=self.error_count,
+                            last_error_code=self.last_error_code,
+                            last_error_message=self.last_error_message,
+                            connection_started_at=self.connection_started_at,
+                            last_data_received_at=self.last_data_received
+                        )
+                    )
+                    await db.execute(update_stmt)
+                else:
+                    # Insert new record
+                    insert_stmt = insert(ConnectionState).values(
+                        client_id=self.client_id,
+                        status=status,
+                        last_heartbeat=datetime.now(),
+                        error_count=self.error_count,
+                        last_error_code=self.last_error_code,
+                        last_error_message=self.last_error_message,
+                        connection_started_at=self.connection_started_at,
+                        last_data_received_at=self.last_data_received
+                    )
+                    await db.execute(insert_stmt)
+                
+                await db.commit()
+                
+        except Exception as e:
+            logger.error("Failed to update connection state", error=str(e))
+    
+    async def _log_api_request(self, request_type: str, req_id: int, symbol: str = None, 
+                              status: str = "SUCCESS", error_msg: str = None):
+        """Log API request for monitoring purposes"""
+        try:
+            async with get_async_session() as db:
+                insert_stmt = insert(ApiRequest).values(
+                    request_type=request_type,
+                    req_id=req_id,
+                    symbol=symbol,
+                    timestamp=datetime.now(),
+                    status=status,
+                    error_message=error_msg[:500] if error_msg else None,
+                    client_id=self.client_id
+                )
+                await db.execute(insert_stmt)
+                await db.commit()
+        except Exception as e:
+            logger.error("Failed to log API request", error=str(e))
+    
+    def _start_health_monitoring(self):
+        """Start background health monitoring thread"""
+        if self.health_monitor_thread and self.health_monitor_thread.is_alive():
+            return
+        
+        self.stop_health_monitor = False
+        self.health_monitor_thread = threading.Thread(
+            target=self._health_monitor_loop,
+            name=f"IBKRHealthMonitor-{self.client_id}",
+            daemon=True
+        )
+        self.health_monitor_thread.start()
+        logger.debug("Health monitoring started")
+    
+    def _stop_health_monitoring(self):
+        """Stop background health monitoring"""
+        self.stop_health_monitor = True
+        if self.health_monitor_thread and self.health_monitor_thread.is_alive():
+            self.health_monitor_thread.join(timeout=5)
+        logger.debug("Health monitoring stopped")
+    
+    def _health_monitor_loop(self):
+        """Background health monitoring loop"""
+        while not self.stop_health_monitor:
+            try:
+                if self.is_connected:
+                    # Update heartbeat
+                    self.last_heartbeat = datetime.now()
+                    
+                    # Update connection state in database
+                    asyncio.create_task(self._update_connection_state("CONNECTED"))
+                    
+                    # Check for data staleness
+                    if self.last_data_received:
+                        time_since_data = datetime.now() - self.last_data_received
+                        if time_since_data > timedelta(minutes=10):
+                            logger.warning("No data received recently", 
+                                         minutes_since_data=time_since_data.total_seconds() / 60)
+                
+                time.sleep(self.health_check_interval)
+                
+            except Exception as e:
+                logger.error("Health monitor error", error=str(e))
+                time.sleep(self.health_check_interval)
+    
+    def shutdown(self):
+        """Clean shutdown of the client"""
+        logger.info("Shutting down IBKR client", client_id=self.client_id)
+        
+        # Stop health monitoring
+        self._stop_health_monitoring()
+        
+        # Cancel all pending subscriptions
+        for req_id in list(self.market_data_callbacks.keys()):
+            self.cancel_market_data(req_id)
+        
+        # Disconnect from TWS
+        self.disconnect_from_tws()
+        
+        # Update final connection state
+        asyncio.create_task(self._update_connection_state("DISCONNECTED"))
+        
+        logger.info("IBKR client shutdown completed")
