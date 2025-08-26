@@ -19,7 +19,7 @@ class TestHealthEndpoints:
         
         assert data["status"] == "healthy"
         assert "timestamp" in data
-        assert data["service"] == "ASX200 Trading System"
+        assert data["service"] == "Scizor Trading System"
         assert "version" in data
     
     def test_detailed_health_check_success(self, client):
@@ -149,8 +149,8 @@ class TestDashboardEndpoints:
         """Test market data overview endpoint."""
         # Mock market data collector
         with patch('app.data.collectors.market_data.MarketDataCollector') as mock_collector, \
-             patch('app.data.collectors.asx_contracts.get_asx200_symbols') as mock_symbols, \
-             patch('app.data.collectors.asx_contracts.get_liquid_stocks') as mock_liquid:
+             patch('app.data.services.watchlist_service.WatchlistService.get_all_symbols_for_daily_collection') as mock_symbols, \
+             patch('app.data.services.watchlist_service.WatchlistService.get_high_priority_symbols') as mock_liquid:
             
             mock_symbols.return_value = ['BHP', 'CBA', 'CSL'] * 67  # ~200 symbols
             mock_liquid.return_value = ['BHP', 'CBA', 'CSL', 'ANZ', 'WBC'] * 4  # 20 symbols
@@ -183,10 +183,10 @@ class TestDashboardEndpoints:
     
     def test_get_symbols_list(self, client):
         """Test symbols list endpoint."""
-        with patch('app.data.collectors.asx_contracts.get_asx200_symbols') as mock_asx200, \
-             patch('app.data.collectors.asx_contracts.get_liquid_stocks') as mock_liquid:
+        with patch('app.data.services.watchlist_service.WatchlistService.get_all_symbols_for_daily_collection') as mock_all_symbols, \
+             patch('app.data.services.watchlist_service.WatchlistService.get_high_priority_symbols') as mock_priority:
             
-            mock_asx200.return_value = ['BHP', 'CBA', 'CSL', 'ANZ', 'WBC']
+            mock_all_symbols.return_value = [Mock(symbol='BHP'), Mock(symbol='CBA'), Mock(symbol='CSL'), Mock(symbol='ANZ'), Mock(symbol='WBC')]
             mock_liquid.return_value = ['BHP', 'CBA', 'CSL']
             
             response = client.get("/api/dashboard/symbols")
@@ -194,11 +194,11 @@ class TestDashboardEndpoints:
             assert response.status_code == 200
             data = response.json()
             
-            assert "asx200" in data
+            assert "all_symbols" in data
             assert "liquid" in data
             assert "total_count" in data
             
-            assert len(data["asx200"]) == 5
+            assert len(data["all_symbols"]) == 5
             assert len(data["liquid"]) == 3
             assert data["total_count"] == 5
     
@@ -208,7 +208,7 @@ class TestDashboardEndpoints:
             # Mock successful data collection start
             mock_instance = Mock()
             mock_instance.start_collection = AsyncMock(return_value=True)
-            mock_instance.subscribe_to_asx200_sample = AsyncMock(return_value=[1001, 1002, 1003])
+            mock_instance.subscribe_to_symbols_sample = AsyncMock(return_value=[1001, 1002, 1003])
             mock_collector.return_value = mock_instance
             
             response = client.post("/api/dashboard/data-collection/start")
@@ -294,7 +294,7 @@ class TestRootEndpoint:
         assert response.status_code == 200
         data = response.json()
         
-        assert data["message"] == "ASX200 Trading System API"
+        assert data["message"] == "Scizor Trading System API"
         assert "version" in data
         assert data["status"] == "running"
 
@@ -450,7 +450,7 @@ class TestAPIIntegrationScenarios:
                 'connection_status': {'connected': False}
             }
             mock_instance.start_collection = AsyncMock(return_value=True)
-            mock_instance.subscribe_to_asx200_sample = AsyncMock(return_value=[1001, 1002])
+            mock_instance.subscribe_to_symbols_sample = AsyncMock(return_value=[1001, 1002])
             mock_instance.stop_collection = AsyncMock()
             mock_collector.return_value = mock_instance
             

@@ -52,28 +52,30 @@ async def get_market_data_overview():
     """Get market data overview for dashboard"""
     try:
         collector = MarketDataCollector()
+        watchlist_service = WatchlistService()
         
-        # Get available symbols
-        asx200_symbols = get_asx200_symbols()
-        liquid_symbols = get_liquid_stocks(20)
+        # Get available symbols from database
+        all_symbols = await watchlist_service.get_all_symbols_for_daily_collection()
+        intraday_symbols = await watchlist_service.get_high_priority_symbols(min_priority=8)
         
-        # Get latest data for liquid stocks
+        # Get latest data for top 10 intraday symbols
         latest_data = {}
-        for symbol in liquid_symbols[:10]:  # Limit to first 10 for dashboard
-            data_point = collector.get_latest_data(symbol)
+        for symbol_info in intraday_symbols[:10]:  # Limit to first 10 for dashboard
+            data_point = collector.get_latest_data(symbol_info.symbol)
             if data_point:
-                latest_data[symbol] = {
+                latest_data[symbol_info.symbol] = {
                     "price": data_point.price,
                     "bid": data_point.bid,
                     "ask": data_point.ask,
                     "volume": data_point.volume,
-                    "timestamp": data_point.timestamp.isoformat()
+                    "timestamp": data_point.timestamp.isoformat(),
+                    "company_name": symbol_info.long_name
                 }
         
         return {
             "timestamp": datetime.utcnow().isoformat(),
-            "total_symbols": len(asx200_symbols),
-            "liquid_symbols": len(liquid_symbols),
+            "total_symbols": len(all_symbols),
+            "intraday_symbols": len(intraday_symbols),
             "latest_data": latest_data,
             "data_points_available": len(latest_data)
         }
@@ -87,10 +89,19 @@ async def get_market_data_overview():
 async def get_symbols_list():
     """Get list of available symbols"""
     try:
+        watchlist_service = WatchlistService()
+        
+        all_symbols = await watchlist_service.get_all_symbols_for_daily_collection()
+        intraday_symbols = await watchlist_service.get_intraday_symbols()
+        high_priority = await watchlist_service.get_high_priority_symbols(min_priority=8)
+        
         return {
-            "asx200": get_asx200_symbols(),
-            "liquid": get_liquid_stocks(20),
-            "total_count": len(get_asx200_symbols())
+            "all_symbols": [s.symbol for s in all_symbols],
+            "intraday_symbols": [s.symbol for s in intraday_symbols],
+            "high_priority": [s.symbol for s in high_priority],
+            "total_count": len(all_symbols),
+            "intraday_count": len(intraday_symbols),
+            "high_priority_count": len(high_priority)
         }
     except Exception as e:
         logger.error("Error getting symbols list", error=str(e))
@@ -104,8 +115,13 @@ async def start_data_collection():
         collector = MarketDataCollector()
         
         if await collector.start_collection():
-            # Start with a small sample for testing
-            req_ids = await collector.subscribe_to_asx200_sample(max_symbols=5)
+            # Start with high priority symbols for testing
+            watchlist_service = WatchlistService()
+            priority_symbols = await watchlist_service.get_high_priority_symbols(min_priority=8)
+            
+            req_ids = await collector.subscribe_to_symbols(
+                [s.symbol for s in priority_symbols[:5]]  # Limit to 5 for testing
+            )
             
             return {
                 "status": "started",

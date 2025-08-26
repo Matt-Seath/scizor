@@ -9,20 +9,20 @@ from app.backtest.metrics import PerformanceAnalyzer, ReportGenerator
 from app.strategies.momentum import MomentumBreakoutStrategy, MomentumBreakoutParameters
 from app.strategies.mean_reversion import MeanReversionStrategy, MeanReversionParameters
 from app.data.processors.signals import SignalProcessor
-from app.data.processors.technical import ASXTechnicalAnalyzer
-from app.data.collectors.asx_contracts import get_asx200_symbols, get_liquid_stocks
+from app.data.processors.technical import TechnicalAnalyzer
+# from app.data.collectors.asx_contracts import get_asx200_symbols, get_liquid_stocks  # Deprecated
 
 logger = structlog.get_logger(__name__)
 
 
 class StrategyValidator:
     """
-    Validates trading strategies using historical ASX200 data
+    Validates trading strategies using historical data
     Runs comprehensive backtests and performance analysis
     """
     
     def __init__(self):
-        self.analyzer = ASXTechnicalAnalyzer()
+        self.analyzer = TechnicalAnalyzer()
         self.signal_processor = SignalProcessor()
         
     def validate_strategy(self, strategy_name: str, 
@@ -37,7 +37,7 @@ class StrategyValidator:
             start_date: Backtest start date
             end_date: Backtest end date
             initial_capital: Starting capital
-            symbols: List of symbols to test (defaults to liquid ASX stocks)
+            symbols: List of symbols to test (defaults to liquid stocks)
             
         Returns:
             Dictionary with validation results
@@ -305,7 +305,7 @@ class StrategyValidator:
         - All strategies show positive Sharpe ratio (>1.0) in backtests
         - Signal generation latency <5 seconds
         - Backtest results match manual calculations
-        - Strategy parameters are optimized for ASX200 data
+        - Strategy parameters are optimized for swing trading data
         """
         validation_details = []
         passed_checks = 0
@@ -354,9 +354,9 @@ class StrategyValidator:
         }
 
 
-class ASXBacktestRunner:
+class BacktestRunner:
     """
-    Convenient runner for ASX200 strategy backtests
+    Convenient runner for strategy backtests
     """
     
     @staticmethod
@@ -407,7 +407,7 @@ class ASXBacktestRunner:
         """Print a summary of validation results"""
         
         print("\n" + "="*60)
-        print("ASX200 STRATEGY VALIDATION SUMMARY")
+        print("STRATEGY VALIDATION SUMMARY")
         print("="*60)
         
         for strategy_name, result in results.items():

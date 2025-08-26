@@ -3,16 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "asx200-trading-system"
+name = "scizor-trading-system"
 version = "0.1.0"
-description = "ASX200 Algorithmic Trading System using IBKR TWS API"
+description = "Scizor Algorithmic Trading System using IBKR TWS API"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Matt Seath", email = "matt@example.com"},
 ]
-keywords = ["trading", "algorithmic", "asx200", "ibkr", "quantitative"]
+keywords = ["trading", "algorithmic", "scizor", "ibkr", "quantitative"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",

@@ -83,8 +83,8 @@ async def detailed_health_check(db: AsyncSession = Depends(get_async_db)):
     
     # Market hours check
     try:
-        from app.data.collectors.market_data import ASXMarketHours
-        market_hours = ASXMarketHours()
+        from app.data.collectors.market_data import MarketHours
+        market_hours = MarketHours()
         
         health_status["checks"]["market_hours"] = {
             "status": "healthy",

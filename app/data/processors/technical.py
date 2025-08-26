@@ -8,7 +8,7 @@ logger = structlog.get_logger(__name__)
 
 class TechnicalIndicators:
     """
-    Technical analysis indicators for ASX200 trading strategies
+    Technical analysis indicators for swing trading strategies
     Optimized for swing trading timeframes (daily data)
     """
     
@@ -213,10 +213,10 @@ class TechnicalIndicators:
         return ((prices / prices.shift(period)) - 1) * 100
 
 
-class ASXTechnicalAnalyzer:
+class TechnicalAnalyzer:
     """
-    ASX-specific technical analysis with market characteristics
-    Optimized for Australian market conditions and trading hours
+    Technical analysis with market characteristics
+    Optimized for swing trading strategies and market conditions
     """
     
     def __init__(self):

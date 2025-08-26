@@ -18,18 +18,22 @@ from app.config.settings import settings
 logger = structlog.get_logger(__name__)
 
 
-@celery_app.task(bind=True, name='app.tasks.data_collection.collect_daily_asx_data')
-def collect_daily_asx_data(self, symbols: Optional[List[str]] = None):
+@celery_app.task(bind=True, name='app.tasks.data_collection.collect_daily_data')
+def collect_daily_data(self, symbols: Optional[List[str]] = None, exchange: str = "ASX"):
     """
-    Celery task to collect daily ASX200 market data
-    Runs daily at 4:10 PM ASX time (post-market close)
+    Celery task to collect daily market data
+    Runs daily at market close time for specified exchange
+    
+    Args:
+        symbols: Optional list of symbols to collect (None = all from database)
+        exchange: Exchange to collect from (default: ASX)
     """
     task_id = self.request.id
-    logger.info("Starting daily ASX data collection", task_id=task_id)
+    logger.info("Starting daily data collection", task_id=task_id, exchange=exchange)
     
     try:
         # Run the async data collection
-        result = asyncio.run(_async_collect_daily_data(symbols, task_id))
+        result = asyncio.run(_async_collect_daily_data(symbols, exchange, task_id))
         
         if result['success']:
             logger.info("Daily data collection completed successfully", 
@@ -57,7 +61,7 @@ def collect_daily_asx_data(self, symbols: Optional[List[str]] = None):
         raise self.retry(countdown=300, max_retries=3)  # Retry in 5 minutes
 
 
-async def _async_collect_daily_data(symbols: Optional[List[str]], task_id: str) -> dict:
+async def _async_collect_daily_data(symbols: Optional[List[str]], exchange: str, task_id: str) -> dict:
     """Async helper function for data collection"""
     start_time = datetime.now()
     collected_count = 0
@@ -77,7 +81,7 @@ async def _async_collect_daily_data(symbols: Optional[List[str]], task_id: str) 
         # Use all symbols from database if none provided
         if symbols is None:
             watchlist_service = WatchlistService()
-            symbol_info_list = await watchlist_service.get_all_symbols_for_daily_collection()
+            symbol_info_list = await watchlist_service.get_all_symbols_for_daily_collection(exchange)
             symbols = [info.symbol for info in symbol_info_list]
         
         logger.info("Collecting data for symbols", count=len(symbols))
@@ -362,7 +366,7 @@ async def _async_validate_data(task_id: str) -> dict:
             
             if daily_count == 0:
                 issues.append("No daily price data found for today")
-            elif daily_count < 100:  # Expect at least 100 ASX200 stocks
+            elif daily_count < 100:  # Expect at least 100 stocks
                 issues.append(f"Low daily data count: {daily_count} (expected >100)")
             
             symbols_validated = daily_count
@@ -795,9 +799,9 @@ def validate_symbol_data(self, symbol: str, days_lookback: int = 30):
 async def _async_validate_symbol(symbol: str, days_lookback: int, task_id: str) -> dict:
     """Async helper function for symbol validation"""
     try:
-        from app.data.processors.validation import ASXDataValidator
+        from app.data.processors.validation import DataValidator
         
-        validator = ASXDataValidator()
+        validator = DataValidator()
         
         # Update task progress
         if hasattr(current_task, 'update_state'):
@@ -910,7 +914,7 @@ async def _async_validate_batch(symbols: List[str], days_lookback: int, task_id:
                 )
             
             # Perform batch validation
-            validation_reports = await batch_validator.validate_asx200_batch(
+            validation_reports = await batch_validator.validate_batch(
                 db_session, symbols, days_lookback
             )
             

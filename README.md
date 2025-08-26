@@ -1,13 +1,13 @@
-# ASX200 Swing Trading Algorithm
+# Scizor - Algorithmic Trading Platform
 
 > **⚠️ IMPORTANT DISCLAIMER**: This is an automated algorithmic trading system that involves real financial risk. Trading involves the possibility of financial loss. Only use this system with capital you can afford to lose. Past performance does not guarantee future results.
 
-An automated swing trading system for ASX200 stocks using the IBKR TWS API. Designed for professional day-traders seeking consistent returns with minimal manual intervention.
+An automated swing trading platform using the IBKR TWS API. Currently focused on ASX200 stocks, with architecture designed to support multiple exchanges. Built for professional traders seeking consistent returns with minimal manual intervention.
 
 ## 🎯 Project Overview
 
 **Primary Goal**: Generate consistent returns (15-25% annually) through automated swing trading with minimal maintenance  
-**Target Market**: ASX200 stocks only  
+**Primary Market**: ASX200 (multi-exchange architecture)  
 **Trading Style**: Swing trading (2-10 day holding periods)  
 **Risk Management**: Conservative approach with strict risk controls  
 
@@ -47,7 +47,8 @@ An automated swing trading system for ASX200 stocks using the IBKR TWS API. Desi
 
 **CRITICAL**: Live trading requires paid market data subscriptions:
 
-- **ASX Real-time Data**: ~$45 AUD/month (required for production)
+- **Primary Market Data** (ASX): ~$45 AUD/month (required for production)
+- Additional exchanges available as needed
 - **Development**: Free delayed data available (15-20 min delay)
 - **Paper Trading**: Use delayed data for strategy validation
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import structlog
 
 from app.data.models.signals import Signal
-from app.data.processors.technical import ASXTechnicalAnalyzer
+from app.data.processors.technical import TechnicalAnalyzer
 from app.utils.logging import get_trading_logger
 
 logger = structlog.get_logger(__name__)
@@ -60,12 +60,12 @@ class StrategySignal:
 class BaseStrategy(ABC):
     """
     Abstract base class for all trading strategies
-    Provides common functionality for ASX200 swing trading
+    Provides common functionality for swing trading
     """
     
     def __init__(self, parameters: StrategyParameters):
         self.parameters = parameters
-        self.analyzer = ASXTechnicalAnalyzer()
+        self.analyzer = TechnicalAnalyzer()
         self.active_positions: Dict[str, datetime] = {}  # symbol -> entry_date
         self.position_count = 0
         

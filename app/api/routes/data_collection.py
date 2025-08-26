@@ -9,7 +9,7 @@ from app.config.database import get_async_db
 from app.data.models.market import DailyPrice, ApiRequest
 from app.data.services.watchlist_service import WatchlistService
 from app.tasks.data_collection import (
-    collect_daily_asx_data, 
+    collect_daily_data, 
     collect_sample_data,
     test_ibkr_connection,
     backfill_historical_data,
@@ -25,20 +25,30 @@ router = APIRouter()
 @router.post("/trigger/daily")
 async def trigger_daily_collection(
     background_tasks: BackgroundTasks,
-    symbols: Optional[List[str]] = None
+    symbols: Optional[List[str]] = None,
+    exchange: str = "ASX"
 ):
-    """Manually trigger daily ASX200 data collection"""
+    """Manually trigger daily data collection"""
     try:
-        # Submit task to Celery
-        task = collect_daily_asx_data.delay(symbols)
+        # Get symbol count from watchlist service if no symbols provided
+        if symbols is None:
+            watchlist_service = WatchlistService()
+            all_symbols = await watchlist_service.get_all_symbols_for_daily_collection(exchange)
+            symbols_count = len(all_symbols)
+        else:
+            symbols_count = len(symbols)
         
-        logger.info("Daily collection task triggered", task_id=task.id)
+        # Submit task to Celery
+        task = collect_daily_data.delay(symbols, exchange)
+        
+        logger.info("Daily collection task triggered", task_id=task.id, exchange=exchange)
         
         return {
             "status": "triggered",
             "task_id": task.id,
-            "message": "Daily data collection task has been queued",
-            "symbols_count": len(symbols) if symbols else len(get_asx200_symbols())
+            "message": f"Daily data collection task has been queued for {exchange}",
+            "symbols_count": symbols_count,
+            "exchange": exchange
         }
         
     except Exception as e:
@@ -62,6 +72,11 @@ async def trigger_sample_collection(
                 detail="Maximum 50 symbols allowed for sample collection"
             )
         
+        # Get high priority symbols for sample
+        watchlist_service = WatchlistService()
+        high_priority = await watchlist_service.get_high_priority_symbols(min_priority=8)
+        sample_symbols = [s.symbol for s in high_priority[:max_symbols]]
+        
         task = collect_sample_data.delay(max_symbols)
         
         logger.info("Sample collection task triggered", 
@@ -71,7 +86,7 @@ async def trigger_sample_collection(
             "status": "triggered",
             "task_id": task.id,
             "message": f"Sample data collection for {max_symbols} symbols queued",
-            "symbols": get_liquid_stocks(max_symbols)
+            "symbols": sample_symbols
         }
         
     except Exception as e:
@@ -244,12 +259,21 @@ async def get_latest_price(
 
 @router.get("/symbols")
 async def get_available_symbols():
-    """Get list of available ASX200 symbols"""
+    """Get list of available symbols from watchlists"""
     try:
+        watchlist_service = WatchlistService()
+        
+        all_symbols = await watchlist_service.get_all_symbols_for_daily_collection()
+        intraday_symbols = await watchlist_service.get_intraday_symbols()
+        high_priority = await watchlist_service.get_high_priority_symbols(min_priority=8)
+        watchlist_summary = await watchlist_service.get_watchlist_summary()
+        
         return {
-            "asx200_symbols": get_asx200_symbols(),
-            "liquid_stocks_20": get_liquid_stocks(20),
-            "total_symbols": len(get_asx200_symbols())
+            "all_symbols": [s.symbol for s in all_symbols],
+            "intraday_symbols": [s.symbol for s in intraday_symbols],
+            "high_priority_symbols": [s.symbol for s in high_priority],
+            "total_symbols": len(all_symbols),
+            "watchlist_summary": watchlist_summary
         }
         
     except Exception as e:
@@ -796,11 +820,11 @@ async def get_validation_report(
         symbol: Stock symbol (e.g., 'BHP', 'CBA')
     """
     try:
-        from app.data.processors.validation import ASXDataValidator
+        from app.data.processors.validation import DataValidator
         
         symbol = symbol.upper().strip()
         
-        validator = ASXDataValidator()
+        validator = DataValidator()
         validation_report = await validator.validate_symbol_data(symbol, db, days_lookback=30)
         
         # Convert ValidationIssue objects to dictionaries for JSON serialization
@@ -878,10 +902,11 @@ async def get_validation_summary(
                 detail="Maximum 30 days lookback allowed for synchronous validation"
             )
         
-        # Use liquid stocks if no symbols provided
+        # Use high priority symbols if no symbols provided
         if symbols is None:
-            from app.data.collectors.asx_contracts import get_liquid_stocks
-            symbols = get_liquid_stocks(20)  # Top 20 liquid stocks
+            watchlist_service = WatchlistService()
+            high_priority = await watchlist_service.get_high_priority_symbols(min_priority=8)
+            symbols = [s.symbol for s in high_priority[:20]]  # Top 20 high priority symbols
         else:
             if len(symbols) > 20:
                 raise HTTPException(
@@ -893,7 +918,7 @@ async def get_validation_summary(
         from app.data.processors.validation import BatchDataValidator
         
         batch_validator = BatchDataValidator()
-        validation_reports = await batch_validator.validate_asx200_batch(db, symbols, days_lookback)
+        validation_reports = await batch_validator.validate_batch(db, symbols, days_lookback)
         batch_summary = batch_validator.generate_batch_summary(validation_reports)
         
         # Create simplified symbol summaries

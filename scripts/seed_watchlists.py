@@ -57,11 +57,11 @@ async def create_watchlists_from_json(json_file: str = "app/data/seeds/watchlist
             all_contracts = result.fetchall()
             
             if not all_contracts:
-                logger.error("No ASX contracts found in database. Run contract population first.")
+                logger.error("No contracts found in database. Run contract population first.")
                 return False
             
             contract_lookup = {contract.symbol: contract.con_id for contract in all_contracts}
-            logger.info("Found ASX contracts for validation", count=len(contract_lookup))
+            logger.info("Found contracts for validation", count=len(contract_lookup))
             
             # Process each watchlist from JSON
             for watchlist_config in watchlist_configs:

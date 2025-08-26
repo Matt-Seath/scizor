@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from app.strategies.base import BaseStrategy, StrategyParameters, StrategySignal, StrategyValidator
 from app.strategies.momentum import MomentumBreakoutStrategy, MomentumBreakoutParameters
 from app.strategies.mean_reversion import MeanReversionStrategy, MeanReversionParameters
-from app.data.processors.technical import ASXTechnicalAnalyzer
+from app.data.processors.technical import TechnicalAnalyzer
 from tests.conftest import assert_signal_is_valid
 
 
@@ -149,7 +149,7 @@ class TestMomentumBreakoutStrategy:
     
     def test_generate_entry_signals_with_indicators(self, sample_price_data):
         """Test entry signal generation with technical indicators."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         # Manually set some indicator values to trigger a signal
@@ -171,7 +171,7 @@ class TestMomentumBreakoutStrategy:
     
     def test_breakout_strength_calculation(self, sample_price_data):
         """Test breakout strength calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         strategy = MomentumBreakoutStrategy()
@@ -186,7 +186,7 @@ class TestMomentumBreakoutStrategy:
     
     def test_momentum_failure_detection(self, sample_price_data):
         """Test momentum failure detection."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         strategy = MomentumBreakoutStrategy()
@@ -207,7 +207,7 @@ class TestMomentumBreakoutStrategy:
         strategy.active_positions = {'BHP': datetime.now(), 'CBA': datetime.now()}
         strategy.position_count = 2
         
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         signals = strategy.generate_entry_signals({'TEST': data_with_indicators}, datetime.now())
@@ -236,7 +236,7 @@ class TestMeanReversionStrategy:
     
     def test_mean_reversion_strength_calculation(self, sample_price_data):
         """Test mean reversion strength calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         strategy = MeanReversionStrategy()
@@ -255,7 +255,7 @@ class TestMeanReversionStrategy:
     
     def test_exit_strength_calculation(self, sample_price_data):
         """Test exit strength calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         strategy = MeanReversionStrategy()
@@ -273,7 +273,7 @@ class TestMeanReversionStrategy:
     
     def test_trend_filter(self, sample_price_data):
         """Test trend filter functionality."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         strategy = MeanReversionStrategy()
@@ -403,7 +403,7 @@ class TestStrategyPerformance:
         for col in ['open', 'high', 'low', 'close']:
             volatile_data[col] = volatile_data[col].clip(lower=1.0)
         
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(volatile_data)
         
         # Test both strategies
@@ -436,7 +436,7 @@ class TestStrategyPerformance:
         trending_data['high'] = trending_data[['open', 'close']].max(axis=1) + np.random.uniform(0, 0.5, 50)
         trending_data['low'] = trending_data[['open', 'close']].min(axis=1) - np.random.uniform(0, 0.5, 50)
         
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         data_with_indicators = analyzer.calculate_all_indicators(trending_data)
         
         momentum_strategy = MomentumBreakoutStrategy()

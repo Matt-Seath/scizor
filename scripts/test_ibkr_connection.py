@@ -17,7 +17,7 @@ import structlog
 
 # We'll create a simple IBKR manager based on your reference
 from app.data.collectors.ibkr_client import IBKRClient
-from app.data.collectors.asx_contracts import create_asx_stock_contract
+from app.utils.ibkr_contracts import create_stock_contract
 from app.config.settings import settings
 
 logger = structlog.get_logger(__name__)
@@ -191,7 +191,7 @@ class AsyncConnectionTester:
                 # Test contract details (optional)
                 print("\n5. Testing contract details request...")
                 try:
-                    bhp_contract = create_asx_stock_contract("BHP")
+                    bhp_contract = create_stock_contract("BHP")
                     contract_success = await self.manager.test_contract_details(bhp_contract)
                     
                     if contract_success:
@@ -234,7 +234,7 @@ class AsyncConnectionTester:
             if success:
                 print("\n🎉 IB Gateway connection test PASSED!")
                 print("\nNext steps:")
-                print("- Test ASX200 data collection")
+                print("- Test data collection")
                 print("- Validate data storage")
                 return True
             else:

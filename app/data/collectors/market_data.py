@@ -8,7 +8,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.collectors.ibkr_client import IBKRClient
-from app.utils.ibkr_contracts import create_asx_stock_contract
+from app.utils.ibkr_contracts import create_stock_contract
 from app.data.services.watchlist_service import WatchlistService
 from app.data.models.market import DailyPrice, IntradayPrice, ApiRequest, ConnectionState
 from app.config.database import AsyncSessionLocal
@@ -46,8 +46,8 @@ class HistoricalBar:
     adjusted_close: Optional[float] = None
 
 
-class ASXMarketHours:
-    """ASX market hours and trading session validation"""
+class MarketHours:
+    """Market hours and trading session validation"""
     
     def __init__(self):
         self.timezone = pytz.timezone('Australia/Sydney')
@@ -57,7 +57,7 @@ class ASXMarketHours:
         self.after_hours_end = datetime_time(19, 0)   # 7:00 PM
     
     def is_market_open(self, dt: datetime = None) -> bool:
-        """Check if ASX market is currently open"""
+        """Check if market is currently open"""
         if dt is None:
             dt = datetime.now(self.timezone)
         
@@ -78,7 +78,7 @@ class ASXMarketHours:
         if dt.weekday() >= 5:
             return False
             
-        # TODO: Add ASX holiday calendar check
+        # TODO: Add holiday calendar check
         return True
     
     def next_market_open(self) -> datetime:
@@ -103,13 +103,13 @@ class ASXMarketHours:
 
 class MarketDataCollector:
     """
-    Collects market data from IBKR TWS API for ASX200 stocks
+    Collects market data from IBKR TWS API
     Handles rate limiting, data validation, and storage
     """
     
     def __init__(self, rate_limiter: IBKRRateLimiter = None):
         self.ibkr_client = IBKRClient()
-        self.market_hours = ASXMarketHours()
+        self.market_hours = MarketHours()
         self.rate_limiter = rate_limiter
         self._rate_limiter_owned = False
         self.active_subscriptions: Dict[int, str] = {}
@@ -261,7 +261,7 @@ class MarketDataCollector:
                 logger.warning("Invalid volume received", symbol=data_point.symbol, volume=data_point.volume)
                 return False
             
-            # Price range checks (ASX stocks typically $0.01 to $1000)
+            # Price range checks (stocks typically $0.01 to $1000)
             if data_point.price and (data_point.price < 0.001 or data_point.price > 10000):
                 logger.warning("Price outside expected range", 
                              symbol=data_point.symbol, price=data_point.price)
@@ -286,7 +286,7 @@ class MarketDataCollector:
                 RequestType.MARKET_DATA,
                 symbol=symbol
             ):
-                contract = create_asx_stock_contract(symbol)
+                contract = create_stock_contract(symbol)
                 callback = self._market_data_callback(symbol)
                 
                 req_id = self.ibkr_client.request_market_data(contract, callback)
@@ -306,8 +306,8 @@ class MarketDataCollector:
             self.collection_stats["errors"] += 1
             return None
     
-    async def subscribe_to_asx200_sample(self, max_symbols: int = 10) -> List[int]:
-        """Subscribe to a sample of ASX200 stocks for testing with proper rate limiting"""
+    async def subscribe_to_symbols_sample(self, max_symbols: int = 10) -> List[int]:
+        """Subscribe to a sample of stocks for testing with proper rate limiting"""
         symbols = get_liquid_stocks(max_symbols)
         request_ids = []
         
@@ -359,7 +359,7 @@ class MarketDataCollector:
                     RequestType.HISTORICAL,
                     symbol=symbol
                 ):
-                    contract = create_asx_stock_contract(symbol)
+                    contract = create_stock_contract(symbol)
                     
                     # Map timeframe to IBKR format
                     bar_size_map = {
@@ -554,7 +554,7 @@ class MarketDataCollector:
     
     async def collect_daily_data(self, symbols: List[str] = None) -> bool:
         """
-        Collect daily historical data for ASX200 stocks
+        Collect daily historical data for stocks
         Uses proper rate limiting and market hours validation
         """
         if not self.rate_limiter:
@@ -562,7 +562,7 @@ class MarketDataCollector:
             return False
             
         if symbols is None:
-            symbols = get_asx200_symbols()
+            # symbols = get_asx200_symbols()  # Deprecated - use WatchlistService instead
         
         # Check if we should collect data (after market close)
         now = datetime.now(self.market_hours.timezone)
@@ -596,7 +596,7 @@ class MarketDataCollector:
                     RequestType.HISTORICAL,
                     symbol=symbol
                 ):
-                    contract = create_asx_stock_contract(symbol)
+                    contract = create_stock_contract(symbol)
                     
                     # Create data buffer for this symbol
                     data_buffer = []
@@ -855,7 +855,7 @@ class MarketDataCollector:
         """Request historical data for a specific date range chunk"""
         try:
             # Create contract for the symbol
-            contract = create_asx_stock_contract(symbol)
+            contract = create_stock_contract(symbol)
             
             # Calculate duration for IBKR request
             duration_days = (end_date - start_date).days + 1

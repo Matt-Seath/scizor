@@ -8,7 +8,7 @@ import structlog
 from app.strategies.base import BaseStrategy, StrategySignal, StrategyValidator
 from app.strategies.momentum import MomentumBreakoutStrategy, MomentumBreakoutParameters
 from app.strategies.mean_reversion import MeanReversionStrategy, MeanReversionParameters
-from app.data.processors.technical import ASXTechnicalAnalyzer
+from app.data.processors.technical import TechnicalAnalyzer
 from app.data.models.signals import Signal
 from app.data.models.market import DailyPrice
 from app.utils.logging import get_trading_logger
@@ -25,7 +25,7 @@ class SignalProcessor:
     
     def __init__(self):
         self.strategies: Dict[str, BaseStrategy] = {}
-        self.analyzer = ASXTechnicalAnalyzer()
+        self.analyzer = TechnicalAnalyzer()
         self.validator = StrategyValidator()
         
         # Initialize default strategies

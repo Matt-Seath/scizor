@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # Application Settings
-    app_name: str = Field(default="ASX200 Trading System", env="APP_NAME")
+    app_name: str = Field(default="Scizor Trading System", env="APP_NAME")
     app_version: str = Field(default="0.1.0", env="APP_VERSION")
     debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")

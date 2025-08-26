@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger = structlog.get_logger(__name__)
     
-    logger.info("Starting ASX200 Trading System", version=settings.app_version)
+    logger.info("Starting Scizor Trading System", version=settings.app_version)
     
     # Initialize database
     try:
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down ASX200 Trading System")
+    logger.info("Shutting down Scizor Trading System")
     try:
         await close_db()
         logger.info("Database connections closed")
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Algorithmic Trading System for ASX200 stocks using IBKR TWS API",
+    description="Scizor Algorithmic Trading Platform - Multi-exchange swing trading system",
     lifespan=lifespan
 )
 
@@ -64,7 +64,7 @@ app.include_router(data_collection.router, prefix="/api/data", tags=["data-colle
 async def root():
     """Root endpoint"""
     return {
-        "message": "ASX200 Trading System API",
+        "message": "Scizor Trading System API",
         "version": settings.app_version,
         "status": "running"
     }

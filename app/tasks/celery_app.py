@@ -35,7 +35,7 @@ celery_app.conf.update(
     # Retry configuration
     task_annotations={
         '*': {'rate_limit': '10/s'},
-        'app.tasks.data_collection.collect_daily_asx_data': {
+        'app.tasks.data_collection.collect_daily_data': {
             'rate_limit': '1/m',
             'max_retries': 3,
             'default_retry_delay': 300  # 5 minutes
@@ -45,8 +45,8 @@ celery_app.conf.update(
 
 # Beat schedule for periodic tasks
 celery_app.conf.beat_schedule = {
-    'collect-daily-asx-data': {
-        'task': 'app.tasks.data_collection.collect_daily_asx_data',
+    'collect-daily-data': {
+        'task': 'app.tasks.data_collection.collect_daily_data',
         'schedule': crontab(hour=16, minute=10, day_of_week='1-5'),  # 4:10 PM weekdays
         'options': {'queue': 'data_collection'}
     },

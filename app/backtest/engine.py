@@ -89,7 +89,7 @@ class BacktestMetrics:
 class BacktestEngine:
     """
     Backtesting engine for trading strategies
-    Simulates trading on historical ASX200 data
+    Simulates trading on historical data
     """
     
     def __init__(self, config: BacktestConfig):

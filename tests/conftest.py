@@ -12,7 +12,7 @@ import asyncio
 from app.main import app
 from app.config.database import Base, get_async_db
 from app.config.settings import settings
-from app.data.collectors.asx_contracts import get_liquid_stocks
+# from app.data.collectors.asx_contracts import get_liquid_stocks  # Deprecated - use WatchlistService
 
 
 # Test database configuration

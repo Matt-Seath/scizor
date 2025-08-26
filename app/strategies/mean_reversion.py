@@ -44,7 +44,7 @@ class MeanReversionParameters(StrategyParameters):
 
 class MeanReversionStrategy(BaseStrategy):
     """
-    Mean Reversion Strategy for ASX200
+    Mean Reversion Strategy
     
     Entry Criteria:
     - RSI <= 30 (oversold)
@@ -353,7 +353,7 @@ class MeanReversionStrategy(BaseStrategy):
     def get_strategy_description(self) -> str:
         """Get human-readable strategy description"""
         return f"""
-        Mean Reversion Strategy for ASX200
+        Mean Reversion Strategy
         
         Entry Criteria:
         - RSI <= {self.mean_rev_params.rsi_oversold} (oversold)

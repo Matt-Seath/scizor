@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from app.data.processors.technical import TechnicalIndicators, ASXTechnicalAnalyzer
+from app.data.processors.technical import TechnicalIndicators, TechnicalAnalyzer
 from tests.conftest import assert_dataframe_has_indicators
 
 
@@ -135,12 +135,12 @@ class TestTechnicalIndicators:
         assert (valid_d >= 0).all() and (valid_d <= 100).all(), "%D should be between 0 and 100"
 
 
-class TestASXTechnicalAnalyzer:
-    """Test ASX-specific technical analysis."""
+class TestTechnicalAnalyzer:
+    """Test technical analysis."""
     
     def test_calculate_all_indicators(self, sample_price_data):
         """Test calculation of all technical indicators."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         result = analyzer.calculate_all_indicators(sample_price_data)
         
         # Should contain original columns
@@ -160,7 +160,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_bollinger_band_position(self, sample_price_data):
         """Test Bollinger Band position calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         result = analyzer.calculate_all_indicators(sample_price_data)
         
         # BB position should be between 0 and 1 (mostly)
@@ -171,7 +171,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_volume_ratio(self, sample_price_data):
         """Test volume ratio calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         result = analyzer.calculate_all_indicators(sample_price_data)
         
         # Volume ratio should be positive
@@ -183,7 +183,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_identify_breakout_signals(self, sample_price_data):
         """Test breakout signal identification."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         df_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         breakout_signals = analyzer.identify_breakout_signals(df_with_indicators)
@@ -198,7 +198,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_identify_mean_reversion_signals(self, sample_price_data):
         """Test mean reversion signal identification."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         df_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         mean_rev_signals = analyzer.identify_mean_reversion_signals(df_with_indicators)
@@ -213,7 +213,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_calculate_stop_loss(self, sample_price_data):
         """Test stop loss calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         df_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         entry_price = 50.0
@@ -230,7 +230,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_calculate_take_profit(self, sample_price_data):
         """Test take profit calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         df_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         # Test with reasonable entry price that won't hit resistance
@@ -253,7 +253,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_get_market_regime(self, sample_price_data):
         """Test market regime detection."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         df_with_indicators = analyzer.calculate_all_indicators(sample_price_data)
         
         regime = analyzer.get_market_regime(df_with_indicators)
@@ -264,7 +264,7 @@ class TestASXTechnicalAnalyzer:
     
     def test_atr_percent_calculation(self, sample_price_data):
         """Test ATR percentage calculation."""
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         result = analyzer.calculate_all_indicators(sample_price_data)
         
         # ATR percent should be positive and reasonable (typically 1-5% for stocks)
@@ -283,7 +283,7 @@ class TestASXTechnicalAnalyzer:
             'volume': [100000, 110000]
         }, index=pd.date_range(start='2023-01-01', periods=2))
         
-        analyzer = ASXTechnicalAnalyzer()
+        analyzer = TechnicalAnalyzer()
         result = analyzer.calculate_all_indicators(small_data)
         
         # Should not crash and should return original data if calculation fails

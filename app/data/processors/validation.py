@@ -48,16 +48,16 @@ class ValidationReport:
     summary: Dict[str, Any]
 
 
-class ASXDataValidator:
+class DataValidator:
     """
-    ASX market data validation and quality assessment
+    Market data validation and quality assessment
     Implements comprehensive checks for price data integrity
     """
     
     def __init__(self):
-        # ASX-specific validation parameters
+        # Market-specific validation parameters
         self.min_price = 0.001  # Minimum valid price (0.1 cents)
-        self.max_price = 10000.0  # Maximum reasonable price for ASX stocks
+        self.max_price = 10000.0  # Maximum reasonable price for stocks
         self.max_daily_change = 0.50  # 50% maximum daily change (generous for volatility)
         self.min_volume = 0  # Minimum volume (0 is valid for some stocks)
         self.max_volume = 1000000000  # 1 billion shares max
@@ -537,12 +537,12 @@ class BatchDataValidator:
     """Batch validation for multiple symbols"""
     
     def __init__(self):
-        self.validator = ASXDataValidator()
+        self.validator = DataValidator()
     
-    async def validate_asx200_batch(self, db_session: AsyncSession, symbols: List[str] = None, 
+    async def validate_batch(self, db_session: AsyncSession, symbols: List[str] = None, 
                                   days_lookback: int = 30) -> Dict[str, ValidationReport]:
         """
-        Validate multiple ASX200 symbols in batch
+        Validate multiple symbols in batch
         
         Args:
             db_session: Database session

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database setup script for ASX200 Trading System
+Database setup script for Scizor Trading System
 Creates all tables and performs initial database setup
 """
 
@@ -118,7 +118,7 @@ def seed_test_data():
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
         with SessionLocal() as session:
-            # Add a few test ASX200 stocks
+            # Add a few test stocks
             test_symbols = ['BHP', 'CBA', 'CSL', 'ANZ', 'WBC']
             base_date = datetime.now().date() - timedelta(days=30)
             
@@ -168,7 +168,7 @@ def seed_test_data():
 def main():
     """Main setup function"""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='ASX200 Trading System Database Setup')
+    parser = argparse.ArgumentParser(description='Scizor Trading System Database Setup')
     parser.add_argument('--nuke', action='store_true', 
                        help='Drop all existing tables before creating new ones')
     parser.add_argument('--no-seed', action='store_true',
@@ -178,7 +178,7 @@ def main():
     if args.nuke:
         print("🔥 NUKE MODE: Will drop all existing tables first!")
     
-    print("🚀 Starting ASX200 Trading System Database Setup")
+    print("🚀 Starting Scizor Trading System Database Setup")
     print("=" * 50)
     
     # Step 1: Create database and tables
@@ -199,7 +199,7 @@ def main():
     print("\n✅ Database setup completed successfully!")
     print("\nNext steps:")
     print("- Test IB Gateway connection")
-    print("- Run data collection for ASX200 stocks")
+    print("- Run data collection for stocks")
     print("- Validate data quality")
 
 if __name__ == "__main__":

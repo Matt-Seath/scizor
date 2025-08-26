@@ -40,7 +40,7 @@ class MomentumBreakoutParameters(StrategyParameters):
 
 class MomentumBreakoutStrategy(BaseStrategy):
     """
-    Momentum Breakout Strategy for ASX200
+    Momentum Breakout Strategy
     
     Entry Criteria:
     - Price breaks above 20-day high
@@ -291,7 +291,7 @@ class MomentumBreakoutStrategy(BaseStrategy):
     def get_strategy_description(self) -> str:
         """Get human-readable strategy description"""
         return f"""
-        Momentum Breakout Strategy for ASX200
+        Momentum Breakout Strategy
         
         Entry Criteria:
         - Price breaks above {self.momentum_params.lookback_period}-day high

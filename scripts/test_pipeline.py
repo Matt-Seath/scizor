@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 from app.config.settings import settings
 from app.data.collectors.market_data import MarketDataCollector
-from app.data.collectors.asx_contracts import get_liquid_stocks
+# from app.data.collectors.asx_contracts import get_liquid_stocks  # Deprecated - use WatchlistService
 
 logger = structlog.get_logger(__name__)
 
@@ -89,10 +89,10 @@ class PipelineTester:
                 return False
             
             symbols_data = response.json()
-            if len(symbols_data["asx200_symbols"]) == 0:
+            if len(symbols_data.get("all_symbols", [])) == 0:
                 return False
             
-            print(f"   📈 Available symbols: {len(symbols_data['asx200_symbols'])}")
+            print(f"   📈 Available symbols: {len(symbols_data.get('all_symbols', []))}")
             
             # Test collection history endpoint
             response = requests.get(f"{self.api_base}/api/data/history?days=1", timeout=10)
@@ -133,7 +133,7 @@ class PipelineTester:
             
             # Test sample subscription (just 1 symbol for quick test)
             test_symbols = get_liquid_stocks(1)
-            req_ids = await collector.subscribe_to_asx200_sample(1)
+            req_ids = await collector.subscribe_to_symbols_sample(1)
             
             if req_ids:
                 print(f"   📡 Subscribed to {len(req_ids)} symbols for testing")
@@ -209,7 +209,7 @@ class PipelineTester:
         """Run complete test suite"""
         load_dotenv()
         
-        print("🚀 ASX200 Trading System - Pipeline Test Suite")
+        print("🚀 Scizor Trading System - Pipeline Test Suite")
         print("=" * 60)
         
         # Test sequence
@@ -242,7 +242,7 @@ class PipelineTester:
         print(f"\n📊 Success Rate: {success_rate:.1f}%")
         
         if success_rate >= 80:
-            print("🎉 Pipeline is ready for ASX200 data collection!")
+            print("🎉 Pipeline is ready for data collection!")
             return True
         else:
             print("⚠️ Pipeline needs attention before production use")

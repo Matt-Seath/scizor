@@ -5,7 +5,7 @@ from app.config.database import Base
 
 
 class DailyPrice(Base):
-    """Daily OHLCV price data for ASX stocks"""
+    """Daily OHLCV price data for stocks"""
     __tablename__ = "daily_prices"
     
     id = Column(Integer, primary_key=True, index=True)

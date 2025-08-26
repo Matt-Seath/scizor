@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.data.collectors.ibkr_client import IBKRClient
-from app.utils.ibkr_contracts import create_asx_stock_contract
+from app.utils.ibkr_contracts import create_stock_contract
 from app.data.services.watchlist_service import WatchlistService
 from app.data.models.market import DailyPrice, ApiRequest
 from app.config.database import AsyncSessionLocal
@@ -285,7 +285,7 @@ class HistoricalDataCollector:
                 symbol=symbol,
                 identifier=f"{symbol}_{start_date}_{end_date}"
             ):
-                contract = create_asx_stock_contract(symbol)
+                contract = create_stock_contract(symbol)
                 callback = self._create_historical_callback(symbol, data_buffer)
                 
                 # Format end date for IBKR API (YYYYMMDD HH:MM:SS)
@@ -402,7 +402,7 @@ class HistoricalDataCollector:
                 logger.warning("Invalid volume: negative", symbol=symbol, volume=bar.volume)
                 return False
             
-            # Price range check for ASX stocks
+            # Price range check for stocks
             if bar.close > 10000 or bar.close < 0.001:
                 logger.warning("Price outside expected range", symbol=symbol, close=bar.close)
                 return False

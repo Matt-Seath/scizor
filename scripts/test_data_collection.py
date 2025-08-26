@@ -19,7 +19,7 @@ from sqlalchemy import select, func
 from app.config.database import AsyncSessionLocal
 from app.data.models.market import DailyPrice, ContractDetail
 from app.data.collectors.market_data import MarketDataCollector
-from app.data.collectors.asx_contracts import get_liquid_stocks
+# from app.data.collectors.asx_contracts import get_liquid_stocks  # Deprecated - use WatchlistService
 
 logger = structlog.get_logger(__name__)
 
@@ -249,9 +249,9 @@ async def test_data_validation():
         return False
     
     try:
-        from app.data.processors.validation import ASXDataValidator
+        from app.data.processors.validation import DataValidator
         
-        validator = ASXDataValidator()
+        validator = DataValidator()
         
         print(f"   🎯 Testing validation for symbol: {sample_symbol}")
         
@@ -283,7 +283,7 @@ async def test_data_validation():
 
 async def run_comprehensive_test():
     """Run all tests and provide summary"""
-    print("🧪 ASX200 Trading System - Data Collection Test Suite")
+    print("🧪 Scizor Trading System - Data Collection Test Suite")
     print("=" * 60)
     
     tests = [

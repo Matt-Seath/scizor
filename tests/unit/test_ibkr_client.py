@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
 from app.data.collectors.ibkr_client import IBKRClient, RateLimiter
-from app.data.collectors.asx_contracts import create_asx_stock_contract
+from app.utils.ibkr_contracts import create_stock_contract
 
 
 class TestRateLimiter:
@@ -327,7 +327,7 @@ class TestIBKRClient:
         # Mock rate limiter
         client.rate_limiter.acquire = Mock(return_value=True)
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         req_id = client.request_market_data(contract, callback)
@@ -345,7 +345,7 @@ class TestIBKRClient:
         # Mock failed connection
         mock_ensure_conn.return_value = False
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         req_id = client.request_market_data(contract, callback)
@@ -364,7 +364,7 @@ class TestIBKRClient:
         # Mock rate limiter
         client.historical_limiter.acquire = Mock(return_value=True)
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         req_id = client.request_historical_data(contract, "1 M", "1 day", callback)
@@ -386,7 +386,7 @@ class TestIBKRClient:
         client.historical_limiter.acquire = Mock(return_value=False)
         client.historical_limiter.wait_for_token = Mock()
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         with patch('app.data.collectors.ibkr_client.EClient.reqHistoricalData') as mock_req:
@@ -443,7 +443,7 @@ class TestIBKRClientIntegration:
         assert mock_ibkr_client.is_connected == True
         
         # Test market data request
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         req_id = mock_ibkr_client.request_market_data(contract, callback)
@@ -460,7 +460,7 @@ class TestIBKRClientIntegration:
         # Set very low rate limit for testing
         client.rate_limiter = RateLimiter(max_requests=2, time_window=1)
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         with patch('app.data.collectors.ibkr_client.EClient.reqMktData'):
@@ -484,7 +484,7 @@ class TestIBKRClientIntegration:
         client.is_connected = True
         client.rate_limiter.acquire = Mock(return_value=True)
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         # Mock request method to raise exception
@@ -516,7 +516,7 @@ class TestIBKRClientIntegration:
         client = IBKRClient()
         client.is_connected = True
         
-        contract = create_asx_stock_contract('BHP')
+        contract = create_stock_contract('BHP')
         callback = Mock()
         
         # Mock ensure_connection to fail

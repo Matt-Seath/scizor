@@ -1,15 +1,15 @@
-# Algorithmic Trading System - CLAUDE.md
+# Scizor - Algorithmic Trading Platform - CLAUDE.md
 
 ## Project Overview
 
-**Project Name**: ASX200 Swing Trading Algorithm  
-**Purpose**: Automated algorithmic trading system for ASX200 stocks using swing trading strategies  
+**Project Name**: Scizor  
+**Purpose**: Automated algorithmic trading system focused on ASX200 swing trading strategies  
 **Target User**: Professional day-trader with limited time for active management  
 **Primary Goal**: Generate consistent returns with minimal maintenance through automated trading  
 
 ### Key Constraints & Requirements
 - **Data Source**: IBKR TWS API (free tier) - must respect rate limits
-- **Market Focus**: ASX200 exchange only
+- **Primary Market**: ASX200 (architecture supports multiple exchanges)
 - **Trading Style**: Swing trading (2-10 day holding periods)
 - **Maintenance**: Low-maintenance, highly automated
 - **Risk Management**: Conservative approach with strict controls
@@ -492,8 +492,8 @@ DATA_COLLECTION_DELAY = 10   # minutes after close to ensure data availability
 # Rate-limited collection strategy (40 req/sec safety margin)
 # Total daily requests: ~270 requests over 10 minutes
 COLLECTION_STRATEGY = {
-    "daily_bars_asx200": {
-        "requests": 200,  # All ASX200 stocks daily OHLCV
+    "daily_bars_primary": {
+        "requests": 200,  # All primary market stocks daily OHLCV
         "batch_size": 20,  # Process in batches
         "delay_between_batches": 15  # seconds (respects rate limits)
     },
@@ -530,37 +530,30 @@ class IBKRClient:
         # Log all connection events
 ```
 
-### ASX Contract Specifications
+### Multi-Exchange Contract Support
 
-**CRITICAL**: ASX contracts require specific parameters for proper market data and order routing.
+**CRITICAL**: Different exchanges require specific parameters for proper market data and order routing.
 
-#### ASX Stock Contract Template
+#### Stock Contract Creation Template
 ```python
-# app/data/collectors/asx_contracts.py
+# app/utils/ibkr_contracts.py
 from ibapi.contract import Contract
 
-def create_asx_stock_contract(symbol: str) -> Contract:
-    """Create properly formatted ASX stock contract"""
+def create_stock_contract(symbol: str, exchange: str = "ASX", currency: str = "AUD") -> Contract:
+    """Create properly formatted stock contract for any exchange"""
     contract = Contract()
-    contract.symbol = symbol.upper()      # e.g., "BHP", "CBA", "ANZ"
+    contract.symbol = symbol.upper()      # e.g., "BHP", "AAPL", "MSFT"
     contract.secType = "STK"              # Stock
-    contract.currency = "AUD"             # Australian Dollars
-    contract.exchange = "ASX"             # Australian Securities Exchange
-    contract.primaryExchange = "ASX"      # Required for ASX stocks
+    contract.currency = currency          # Currency (AUD, USD, etc.)
+    contract.exchange = exchange          # Exchange (ASX, NASDAQ, NYSE, etc.)
+    contract.primaryExchange = exchange   # Required for routing
     return contract
 
-# Example ASX200 contracts
-ASX200_MAJOR_STOCKS = {
-    "BHP": create_asx_stock_contract("BHP"),     # BHP Group
-    "CBA": create_asx_stock_contract("CBA"),     # Commonwealth Bank
-    "CSL": create_asx_stock_contract("CSL"),     # CSL Limited
-    "ANZ": create_asx_stock_contract("ANZ"),     # ANZ Banking Group
-    "WBC": create_asx_stock_contract("WBC"),     # Westpac Banking
-    "NAB": create_asx_stock_contract("NAB"),     # National Australia Bank
-    "WES": create_asx_stock_contract("WES"),     # Wesfarmers
-    "MQG": create_asx_stock_contract("MQG"),     # Macquarie Group
-    "TLS": create_asx_stock_contract("TLS"),     # Telstra Corporation
-    "WOW": create_asx_stock_contract("WOW"),     # Woolworths Group
+# Example usage for different exchanges
+EXAMPLE_CONTRACTS = {
+    "ASX": create_stock_contract("BHP", "ASX", "AUD"),      # ASX stock
+    "NASDAQ": create_stock_contract("AAPL", "NASDAQ", "USD"), # NASDAQ stock
+    "NYSE": create_stock_contract("JPM", "NYSE", "USD"),    # NYSE stock
 }
 ```
 
