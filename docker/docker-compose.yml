@@ -34,7 +34,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+    command: celery -A app.tasks.celery_app worker --loglevel=info --queues=data_collection,monitoring,celery
     env_file:
       - ../.env
     environment:
@@ -61,7 +61,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: celery -A app.tasks.celery_app beat --loglevel=info
+    command: celery -A app.tasks.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     env_file:
       - ../.env
     environment:

@@ -27,6 +27,9 @@ celery_app.conf.update(
         'app.tasks.monitoring.*': {'queue': 'monitoring'},
     },
     
+    # Beat scheduler configuration
+    beat_schedule_filename='/tmp/celerybeat-schedule',
+    
     # Worker configuration
     worker_prefetch_multiplier=1,
     task_acks_late=True,
