@@ -563,6 +563,8 @@ class MarketDataCollector:
             
         if symbols is None:
             # symbols = get_asx200_symbols()  # Deprecated - use WatchlistService instead
+            logger.warning("No symbols provided for data collection")
+            return False
         
         # Check if we should collect data (after market close)
         now = datetime.now(self.market_hours.timezone)

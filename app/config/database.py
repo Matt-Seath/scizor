@@ -61,6 +61,11 @@ async def get_async_db():
             await session.close()
 
 
+def get_async_session():
+    """Direct async session factory for use outside of FastAPI dependencies"""
+    return AsyncSessionLocal()
+
+
 async def init_db():
     """Initialize database tables"""
     async with async_engine.begin() as conn:

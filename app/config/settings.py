@@ -1,17 +1,35 @@
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Database Configuration
-    database_url: str = Field(..., env="DATABASE_URL")
-    async_database_url: str = Field(..., env="ASYNC_DATABASE_URL")
+    # Database Configuration - Individual Components (Required)
     postgres_host: str = Field(..., env="POSTGRES_HOST")
-    postgres_port: int = Field(..., env="POSTGRES_PORT")
+    postgres_port: int = Field(..., env="POSTGRES_PORT") 
     postgres_db: str = Field(..., env="POSTGRES_DB")
     postgres_user: str = Field(..., env="POSTGRES_USER")
     postgres_password: str = Field(..., env="POSTGRES_PASSWORD")
+    
+    # Database URLs - Optional explicit override, otherwise auto-constructed
+    database_url_override: Optional[str] = Field(default=None, env="DATABASE_URL")
+    async_database_url_override: Optional[str] = Field(default=None, env="ASYNC_DATABASE_URL")
+    
+    @computed_field
+    @property  
+    def database_url(self) -> str:
+        """Sync database URL - uses override or auto-constructs from components"""
+        if self.database_url_override:
+            return self.database_url_override
+        return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+    
+    @computed_field
+    @property
+    def async_database_url(self) -> str:
+        """Async database URL - uses override or auto-constructs from components""" 
+        if self.async_database_url_override:
+            return self.async_database_url_override
+        return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
     
     # Redis Configuration
     redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")

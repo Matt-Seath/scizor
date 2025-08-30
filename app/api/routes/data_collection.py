@@ -10,7 +10,6 @@ from app.data.models.market import DailyPrice, ApiRequest
 from app.data.services.watchlist_service import WatchlistService
 from app.tasks.data_collection import (
     collect_daily_data, 
-    collect_sample_data,
     test_ibkr_connection,
     backfill_historical_data,
     batch_backfill_historical_data,
